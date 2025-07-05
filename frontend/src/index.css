@@ -1,0 +1,199 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Dancing+Script:wght@400;600;700&family=Nunito:wght@400;500;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%; /* blanc pur */
+    --foreground: 222 84% 5%; /* noir élégant */
+    --card: 0 0% 100%; /* blanc pur pour cartes */
+    --card-foreground: 222 84% 5%;
+    --popover: 0 0% 100%; /* blanc pur */
+    --popover-foreground: 222 84% 5%;
+    --primary: 348 86% 43%; /* rouge carmin */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 40% 98%; /* gris très clair */
+    --secondary-foreground: 222 84% 5%;
+    --muted: 210 40% 96%; /* gris clair atténué */
+    --muted-foreground: 215 16% 47%;
+    --accent: 326 78% 68%; /* rose moderne */
+    --accent-foreground: 222 84% 5%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 214 32% 91%; /* bordures subtiles */
+    --input: 214 32% 91%; /* inputs */
+    --ring: 348 86% 43%; /* rouge carmin */
+    --radius: 0.75rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans;
+    background: linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 100%);
+    min-height: 100vh;
+    color: #0F172A; /* Texte moderne élégant */
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display font-semibold;
+    color: #0F172A !important; /* Texte moderne élégant */
+  }
+  
+  /* Éléments spéciaux avec la police script */
+  .font-romantic {
+    @apply font-script;
+  }
+  
+  /* S'assurer que le texte reste toujours lisible */
+  p, span, div, label {
+    color: #0F172A !important; /* Texte moderne élégant */
+  }
+  
+  /* Contraste amélioré pour les liens et boutons */
+  a, button {
+    color: inherit; /* Hérite de la couleur du parent */
+  }
+}
+
+@layer components {
+  /* Composants modernes Matcha Rouge Élégant */
+  .btn-primary {
+    @apply bg-primary hover:bg-accent text-white font-semibold py-3 px-6 rounded-2xl 
+           shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] 
+           backdrop-blur-sm border border-primary/20 hover:glow-primary;
+  }
+  
+  .btn-secondary {
+    @apply bg-white hover:bg-slate-50 text-slate-900 font-semibold py-3 px-6 rounded-2xl 
+           shadow-md hover:shadow-lg transition-all duration-300 hover:scale-[1.02]
+           backdrop-blur-sm border border-slate-200 hover:border-primary/30;
+  }
+  
+  .input-field {
+    @apply w-full px-4 py-3 border border-slate-200 rounded-2xl shadow-sm 
+           placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/20 
+           focus:border-primary/60 transition-all duration-300 bg-white backdrop-blur-sm
+           text-slate-900 font-medium hover:border-slate-300;
+  }
+  
+  .card-modern {
+    @apply bg-white rounded-2xl shadow-md border border-slate-200 p-6 
+           backdrop-blur-sm hover:shadow-lg transition-all duration-300 hover:border-slate-300;
+  }
+  
+  .form-error {
+    @apply text-red-700 text-sm mt-1 font-semibold bg-red-50 px-3 py-2 rounded-xl border border-red-200;
+  }
+  
+  .form-success {
+    @apply text-green-700 text-sm mt-1 font-semibold bg-green-50 px-3 py-2 rounded-xl border border-green-200;
+  }
+  
+  .gradient-bg {
+    @apply bg-gradient-modern;
+  }
+  
+  .elegant-bg {
+    @apply bg-gradient-elegant;
+  }
+  
+  .primary-bg {
+    @apply bg-gradient-primary;
+  }
+  
+  .surface-bg {
+    @apply bg-gradient-surface;
+  }
+  
+  /* Animation pour les icônes moderne */
+  .icon-hover {
+    @apply transition-all duration-300 hover:scale-105 hover:text-primary hover:drop-shadow-sm;
+  }
+  
+  /* Badge moderne avec rouge */
+  .tag-badge {
+    @apply inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold
+           bg-slate-100 text-slate-700 border border-slate-200 hover:bg-primary/10 hover:text-primary hover:border-primary/30
+           transition-all duration-300 hover:scale-105;
+  }
+  
+  /* Effet de lueur moderne */
+  .glow-soft {
+    @apply shadow-md shadow-slate-200 hover:shadow-lg hover:shadow-slate-300 transition-all duration-300;
+  }
+  
+  .glow-gentle {
+    @apply shadow-lg shadow-slate-200/50 hover:shadow-xl hover:shadow-slate-300/50 transition-all duration-300 border border-slate-100 hover:border-primary/20;
+  }
+  
+  .glow-primary {
+    @apply shadow-lg shadow-primary/10 hover:shadow-xl hover:shadow-primary/20 transition-all duration-300;
+  }
+  
+  /* Texte avec effet moderne */
+  .text-gradient {
+    @apply bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent font-semibold;
+  }
+  
+  .text-primary-glow {
+    @apply text-primary drop-shadow-sm hover:drop-shadow-md transition-all duration-300;
+  }
+  
+  /* Classes utilitaires modernes */
+  .bg-surface {
+    @apply bg-slate-50;
+  }
+  
+  .bg-card {
+    @apply bg-white;
+  }
+  
+  .bg-modern-card {
+    @apply bg-gradient-to-br from-white to-slate-50 backdrop-blur-sm;
+  }
+  
+  /* Améliorer la lisibilité avec couleurs modernes */
+  .text-readable {
+    color: #0F172A !important;
+    font-weight: 500;
+  }
+  
+  .text-readable-light {
+    color: #64748B !important;
+    font-weight: 400;
+  }
+  
+  /* Contraste élevé moderne */
+  .high-contrast {
+    color: #0F172A !important;
+    font-weight: 600;
+  }
+  
+  /* Classes pour texte moderne */
+  .text-dark {
+    color: #0F172A !important;
+  }
+  
+  .text-muted {
+    color: #64748B !important;
+  }
+  
+  .text-light {
+    color: #94A3B8 !important;
+  }
+  
+  /* Surface moderne avec ombre subtile */
+  .surface-elevated {
+    @apply bg-white shadow-sm border border-slate-200 rounded-2xl;
+  }
+  
+  /* Hover states modernes */
+  .hover-lift {
+    @apply transition-all duration-300 hover:scale-[1.02] hover:shadow-lg;
+  }
+}
