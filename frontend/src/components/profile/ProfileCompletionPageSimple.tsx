@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { User, Camera, MapPin, Heart, ArrowRight, ArrowLeft, Check } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -26,6 +26,14 @@ export const ProfileCompletionPageSimple: React.FC = () => {
   const [profile, setProfile] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+
+  // --- Correction de la boucle infinie ---
+  // On utilise useCallback pour que la fonction ne soit pas recréée à chaque rendu,
+  // ce qui empêche la boucle de se déclencher dans le composant enfant.
+  const handleProfileDataChange = useCallback((data: any) => {
+    setProfile((prev: any) => ({ ...prev, ...data }));
+  }, []); // Le tableau de dépendances vide est crucial
+  // --- Fin de la correction ---
 
   // Définir les étapes (suppression de l'étape informations personnelles)
   const steps: Step[] = [
@@ -128,121 +136,6 @@ export const ProfileCompletionPageSimple: React.FC = () => {
     }
   };
 
-  // Sauvegarder toutes les données du profil en une fois
-  const saveAllProfileData = async (): Promise<boolean> => {
-    setIsSaving(true);
-    
-    try {
-      console.log('=== DEBUT SAUVEGARDE COMPLETE ===');
-      console.log('📋 Profil actuel avant sauvegarde:', profile);
-      
-      // Vérification que nous avons toutes les données nécessaires
-      if (!profile || !profile.age || !profile.gender || !profile.sexual_orientation || !profile.biography) {
-        console.error('❌ Données manquantes dans le profil local:', {
-          age: profile?.age,
-          gender: profile?.gender,
-          sexual_orientation: profile?.sexual_orientation,
-          biography: profile?.biography,
-          interests: profile?.interests?.length || 0
-        });
-        alert('Veuillez compléter toutes les étapes du profil avant de finaliser.');
-        return false;
-      }
-      
-      // 1. Sauvegarder le profil complet directement
-      console.log('💾 Sauvegarde directe du profil...');
-      try {
-        const profileData = {
-          age: profile.age,
-          gender: profile.gender,
-          sexual_orientation: profile.sexual_orientation,
-          biography: profile.biography,
-          interests: profile.interests || []
-        };
-        
-        console.log('📝 Données à sauvegarder:', profileData);
-        await profileApi.updateProfile(profileData);
-        console.log('✅ Profil sauvegardé avec succès');
-      } catch (error) {
-        console.error('❌ Erreur sauvegarde profil:', error);
-        return false;
-      }
-      
-      // 2. Les photos sont déjà sauvegardées à l'upload individuel
-      
-      
-      // 3. Vérifier le profil après sauvegarde
-      console.log('🔍 Vérification du profil après sauvegarde...');
-      try {
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Attendre 1 seconde
-        const profileCheck = await profileApi.getMyProfile();
-        console.log('📋 Profil après sauvegarde:', profileCheck);
-        
-        const isComplete = !!(
-          profileCheck.age &&
-          profileCheck.gender && 
-          profileCheck.sexual_orientation && 
-          profileCheck.biography && 
-          profileCheck.interests && profileCheck.interests.length > 0 &&
-          profileCheck.photos && profileCheck.photos.length > 0
-        );
-        console.log('🎯 Profil complet après sauvegarde:', isComplete);
-        
-        if (!isComplete) {
-          console.warn('⚠️ Le profil ne semble pas complet après sauvegarde');
-          console.warn('Détails manquants:', {
-            age: !!profileCheck.age,
-            gender: !!profileCheck.gender,
-            orientation: !!profileCheck.sexual_orientation,
-            bio: !!profileCheck.biography,
-            interests: !!(profileCheck.interests && profileCheck.interests.length > 0),
-            photos: !!(profileCheck.photos && profileCheck.photos.length > 0)
-          });
-        }
-        
-        return isComplete;
-      } catch (error) {
-        console.warn('⚠️ Erreur vérification profil:', error);
-        // On considère que c'est OK si on ne peut pas vérifier
-        return true;
-      }
-    } catch (error) {
-      console.error('❌ Erreur sauvegarde complète:', error);
-      return false;
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  // Terminer et aller au profil public
-  const finish = async () => {
-    console.log('🚀 === DEBUT PROCESSUS DE FINALISATION ===');
-    const saved = await saveAllProfileData();
-    console.log('💾 Résultat sauvegarde:', saved);
-    
-    if (saved) {
-      console.log('🎉 Profil créé avec succès! Redirection vers votre profil...');
-      
-      // Attendre un peu pour que la base soit synchronisée
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Utiliser la route spéciale sans vérification de profil complet
-      try {
-        console.log('🔄 Redirection vers profile-success...');
-        navigate('/profile-success');
-      } catch (error) {
-        console.error('Erreur redirection:', error);
-        // Fallback avec rechargement de page
-        window.location.href = '/profile-success';
-      }
-    } else {
-      console.error('❌ Échec de la sauvegarde du profil');
-      alert('Erreur lors de la sauvegarde de votre profil. Veuillez réessayer.');
-    }
-  };
-
-  const currentStepData = steps[currentStep];
-
   // Fonction pour tester l'état du profil (accessible via console)
   React.useEffect(() => {
     (window as any).testProfileCompletion = async () => {
@@ -290,6 +183,128 @@ export const ProfileCompletionPageSimple: React.FC = () => {
       delete (window as any).updateParentProfile;
     };
   }, []);
+
+  // Sauvegarder toutes les données du profil en une fois
+  // Retourne true en cas de succès, ou le message d'erreur en cas d'échec
+  const saveAllProfileData = async (): Promise<true | string> => {
+    setIsSaving(true);
+    
+    try {
+      console.log('=== DEBUT SAUVEGARDE COMPLETE ===');
+      console.log('📋 Profil actuel avant sauvegarde:', profile);
+      
+      // Vérification que nous avons toutes les données nécessaires
+      if (!profile || !profile.age || !profile.gender || !profile.sexual_orientation || !profile.biography) {
+        console.error('❌ Données manquantes dans le profil local:', {
+          age: profile?.age,
+          gender: profile?.gender,
+          sexual_orientation: profile?.sexual_orientation,
+          biography: profile?.biography,
+          interests: profile?.interests?.length || 0
+        });
+        alert('Veuillez compléter toutes les étapes du profil avant de finaliser.');
+        return 'Données de profil local manquantes. Veuillez compléter toutes les étapes.'; // Retourner une string au lieu de false
+      }
+      
+      // 1. Sauvegarder le profil complet directement
+      console.log('💾 Sauvegarde directe du profil...');
+      try {
+        // --- Correction : S'assurer que les 'interests' sont un tableau de strings ---
+        const interestsAsStrings = (profile.interests || []).map((interest: any) => {
+          return typeof interest === 'string' ? interest : interest.name;
+        }).filter(Boolean); // Filtrer les valeurs nulles ou undefined
+
+        const profileData = {
+          age: profile.age,
+          gender: profile.gender,
+          sexual_orientation: profile.sexual_orientation,
+          biography: profile.biography,
+          interests: interestsAsStrings
+        };
+        
+        console.log('📝 Données à sauvegarder (après correction):', profileData);
+        await profileApi.updateProfile(profileData);
+        console.log('✅ Profil sauvegardé avec succès');
+      } catch (error: any) {
+        console.error('❌ Erreur sauvegarde profil:', error);
+        return error.message || 'Une erreur de sauvegarde est survenue.'; // Retourner le message d'erreur
+      }
+      
+      // 2. Les photos sont déjà sauvegardées à l'upload individuel
+      
+      
+      // 3. Vérifier le profil après sauvegarde
+      console.log('🔍 Vérification du profil après sauvegarde...');
+      try {
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Attendre 1 seconde
+        const profileCheck = await profileApi.getMyProfile();
+        console.log('📋 Profil après sauvegarde:', profileCheck);
+        
+        const isComplete = !!(
+          profileCheck.age &&
+          profileCheck.gender && 
+          profileCheck.sexual_orientation && 
+          profileCheck.biography && 
+          profileCheck.interests && profileCheck.interests.length > 0 &&
+          profileCheck.photos && profileCheck.photos.length > 0
+        );
+        console.log('🎯 Profil complet après sauvegarde:', isComplete);
+        
+        if (!isComplete) {
+          console.warn('⚠️ Le profil ne semble pas complet après sauvegarde');
+          console.warn('Détails manquants:', {
+            age: !!profileCheck.age,
+            gender: !!profileCheck.gender,
+            orientation: !!profileCheck.sexual_orientation,
+            bio: !!profileCheck.biography,
+            interests: !!(profileCheck.interests && profileCheck.interests.length > 0),
+            photos: !!(profileCheck.photos && profileCheck.photos.length > 0)
+          });
+        }
+        
+        return true;
+      } catch (error) {
+        console.warn('⚠️ Erreur vérification profil:', error);
+        // On considère que c'est OK si on ne peut pas vérifier
+        return true;
+      }
+    } catch (error: any) {
+      console.error('❌ Erreur sauvegarde complète:', error);
+      return error.message || 'Une erreur inattendue est survenue.'; // Retourner le message d'erreur
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Terminer et aller au profil public
+  const finish = async () => {
+    console.log('🚀 === DEBUT PROCESSUS DE FINALISATION ===');
+    const result = await saveAllProfileData();
+    console.log('💾 Résultat sauvegarde:', result);
+    
+    if (result === true) {
+      console.log('🎉 Profil créé avec succès! Redirection vers votre profil...');
+      
+      // Attendre un peu pour que la base soit synchronisée
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Utiliser la route spéciale sans vérification de profil complet
+      try {
+        console.log('🔄 Redirection vers profile-success...');
+        navigate('/profile-success');
+      } catch (error) {
+        console.error('Erreur redirection:', error);
+        // Fallback avec rechargement de page
+        window.location.href = '/profile-success';
+      }
+    } else {
+      // Afficher le message d'erreur spécifique
+      console.error('❌ Échec de la sauvegarde du profil:', result);
+      alert(`Erreur de validation:\n\n${result}`);
+    }
+  };
+
+  const currentStepData = steps[currentStep];
 
   if (isLoading) {
     return (
@@ -354,17 +369,17 @@ export const ProfileCompletionPageSimple: React.FC = () => {
           <Card className="mb-6">
             <CardContent className="p-8">
               <motion.div
+                className="bg-white rounded-lg shadow-lg p-8"
                 key={currentStep}
-                initial={{ opacity: 0, x: 20 }}
+                initial={{ opacity: 0, x: 50 }}
                 animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
+                exit={{ opacity: 0, x: -50 }}
                 transition={{ duration: 0.3 }}
               >
-                {/* Rendu du composant de l'étape actuelle */}
                 {currentStep === 0 && (
                   <ProfileFormSimple
                     initialData={profile}
-                    onSave={() => {}} // La sauvegarde est gérée par la page
+                    onDataChange={handleProfileDataChange}
                   />
                 )}
                 
@@ -374,14 +389,12 @@ export const ProfileCompletionPageSimple: React.FC = () => {
                     onPhotosChange={(newPhotos) => {
                       setProfile((prev: any) => ({ ...prev, photos: newPhotos }));
                     }}
-                    onSave={() => {}} // La sauvegarde est gérée par la page
                   />
                 )}
                 
                 {currentStep === 2 && (
                   <LocationPickerSimple
                     initialLocation={profile}
-                    onSave={() => {}} // La sauvegarde est gérée par la page
                   />
                 )}
               </motion.div>

@@ -41,6 +41,10 @@ router.put('/', authenticateToken, async (req: Request, res: Response): Promise<
     // Validation des données
     const validationErrors = validateProfileData(profileData);
     if (validationErrors.length > 0) {
+      // --- Log de débogage ---
+      console.error('❌ Échec de la validation du profil. Données reçues:', JSON.stringify(profileData, null, 2));
+      console.error('Erreurs de validation:', validationErrors);
+      // --- Fin du log ---
       res.status(400).json({ 
         success: false, 
         message: validationErrors.join(', ') 

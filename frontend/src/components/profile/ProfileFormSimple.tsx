@@ -8,7 +8,6 @@ import { profileApi, ProfileData, CompleteProfile } from '../../services/profile
 
 interface ProfileFormSimpleProps {
   initialData?: CompleteProfile;
-  onSave?: (success: boolean, message?: string) => void;
   onDataChange?: (data: ProfileData) => void;
 }
 
@@ -21,7 +20,6 @@ const POPULAR_INTERESTS = [
 
 export const ProfileFormSimple: React.FC<ProfileFormSimpleProps> = ({ 
   initialData, 
-  onSave,
   onDataChange
 }) => {
   const [formData, setFormData] = useState<ProfileData>({
@@ -34,110 +32,8 @@ export const ProfileFormSimple: React.FC<ProfileFormSimpleProps> = ({
       : []
   });
 
-  // Données utilisateur pour nom/prénom/email  
-  const [userData, setUserData] = useState({
-    first_name: (initialData as any)?.first_name || '',
-    last_name: (initialData as any)?.last_name || '',
-    email: (initialData as any)?.email || ''
-  });
-
-  const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [customInterest, setCustomInterest] = useState('');
-  const [saveStatus, setSaveStatus] = useState<{type: 'success' | 'error' | '', message: string}>({type: '', message: ''});
-
-  // Validation du formulaire
-  const validateForm = (): boolean => {
-    const newErrors: Record<string, string> = {};
-
-    // Validation données utilisateur
-    if (!userData.first_name?.trim()) {
-      newErrors.first_name = 'Le prénom est requis';
-    }
-
-    if (!userData.last_name?.trim()) {
-      newErrors.last_name = 'Le nom est requis';
-    }
-
-    if (!userData.email?.trim()) {
-      newErrors.email = 'L\'email est requis';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userData.email)) {
-      newErrors.email = 'Format d\'email invalide';
-    }
-
-    // Validation données profil
-    if (!formData.age || formData.age < 18 || formData.age > 100) {
-      newErrors.age = 'L\'âge doit être entre 18 et 100 ans';
-    }
-
-    if (!formData.gender) {
-      newErrors.gender = 'Le genre est requis';
-    }
-
-    if (!formData.sexual_orientation) {
-      newErrors.sexual_orientation = 'L\'orientation sexuelle est requise';
-    }
-
-    if (!formData.biography || formData.biography.length < 10) {
-      newErrors.biography = 'La biographie doit contenir au moins 10 caractères';
-    }
-
-    if (formData.biography && formData.biography.length > 500) {
-      newErrors.biography = 'La biographie ne peut pas dépasser 500 caractères';
-    }
-
-    if (!formData.interests || formData.interests.length === 0) {
-      newErrors.interests = 'Au moins un centre d\'intérêt est requis';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  // Sauvegarder les données
-  const saveData = async (): Promise<boolean> => {
-    console.log('🔄 Tentative de sauvegarde du profil...');
-    
-    if (!validateForm()) {
-      setSaveStatus({type: 'error', message: 'Veuillez corriger les erreurs avant de continuer'});
-      onSave?.(false, 'Validation échouée');
-      return false;
-    }
-
-    setIsLoading(true);
-    setSaveStatus({type: '', message: ''});
-    
-    try {
-      // Sauvegarder le profil
-      console.log('📝 Sauvegarde profil:', formData);
-      await profileApi.updateProfile(formData);
-      
-      // Sauvegarder les données utilisateur
-      console.log('👤 Sauvegarde utilisateur:', userData);
-      await profileApi.updateUserInfo(userData);
-      
-      setSaveStatus({type: 'success', message: 'Profil sauvegardé avec succès !'});
-      onSave?.(true, 'Profil sauvegardé avec succès');
-      
-      return true;
-    } catch (error: any) {
-      console.error('❌ Erreur sauvegarde profil:', error);
-      const errorMessage = error?.response?.data?.message || error?.message || 'Erreur de sauvegarde';
-      setSaveStatus({type: 'error', message: errorMessage});
-      onSave?.(false, errorMessage);
-      return false;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Exposer la fonction de sauvegarde via ref ou fonction globale
-  React.useEffect(() => {
-    (window as any).saveProfileForm = saveData;
-    return () => {
-      delete (window as any).saveProfileForm;
-    };
-  }, [formData, userData]);
 
   // Notifier le parent des changements de données
   React.useEffect(() => {
@@ -150,40 +46,6 @@ export const ProfileFormSimple: React.FC<ProfileFormSimpleProps> = ({
       ...prev,
       [field]: value
     }));
-
-    // Effacer l'erreur pour ce champ
-    if (errors[field]) {
-      setErrors(prev => ({
-        ...prev,
-        [field]: ''
-      }));
-    }
-
-    // Effacer le statut de sauvegarde lors de modifications
-    if (saveStatus.type) {
-      setSaveStatus({type: '', message: ''});
-    }
-  };
-
-  // Gestion des changements utilisateur
-  const handleUserDataChange = (field: string, value: string) => {
-    setUserData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-
-    // Effacer l'erreur pour ce champ
-    if (errors[field]) {
-      setErrors(prev => ({
-        ...prev,
-        [field]: ''
-      }));
-    }
-
-    // Effacer le statut de sauvegarde lors de modifications
-    if (saveStatus.type) {
-      setSaveStatus({type: '', message: ''});
-    }
   };
 
   // Ajouter un centre d'intérêt
@@ -207,7 +69,12 @@ export const ProfileFormSimple: React.FC<ProfileFormSimpleProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <motion.div 
+      className="space-y-8"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.5 }}
+    >
       {/* Header avec titre */}
       <div className="text-center">
         <div className="flex items-center justify-center gap-3 mb-2">
@@ -219,73 +86,9 @@ export const ProfileFormSimple: React.FC<ProfileFormSimpleProps> = ({
         <p className="text-twilight/60">Parlez-nous de vous et de vos préférences</p>
       </div>
 
-      {/* Status de sauvegarde */}
-      {saveStatus.type && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className={`p-4 rounded-lg border ${
-            saveStatus.type === 'success' 
-              ? 'bg-green-50 border-green-200 text-green-800' 
-              : 'bg-red-50 border-red-200 text-red-800'
-          }`}
-        >
-          {saveStatus.message}
-        </motion.div>
-      )}
-
       {/* Informations de base */}
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="space-y-6"
-      >
+      <div className="space-y-6">
         {/* Informations personnelles */}
-        <div className="grid md:grid-cols-2 gap-6">
-          {/* Prénom */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-twilight">
-              Prénom <span className="text-red-500">*</span>
-            </label>
-            <Input
-              value={userData.first_name}
-              onChange={(e) => handleUserDataChange('first_name', e.target.value)}
-              placeholder="Votre prénom"
-              className={`transition-all duration-200 ${errors.first_name ? 'border-red-400' : ''}`}
-            />
-            {errors.first_name && <p className="text-red-500 text-sm">{errors.first_name}</p>}
-          </div>
-
-          {/* Nom */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-twilight">
-              Nom <span className="text-red-500">*</span>
-            </label>
-            <Input
-              value={userData.last_name}
-              onChange={(e) => handleUserDataChange('last_name', e.target.value)}
-              placeholder="Votre nom"
-              className={`transition-all duration-200 ${errors.last_name ? 'border-red-400' : ''}`}
-            />
-            {errors.last_name && <p className="text-red-500 text-sm">{errors.last_name}</p>}
-          </div>
-        </div>
-
-        {/* Email */}
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-twilight">
-            Email <span className="text-red-500">*</span>
-          </label>
-          <Input
-            type="email"
-            value={userData.email}
-            onChange={(e) => handleUserDataChange('email', e.target.value)}
-            placeholder="votre.email@exemple.com"
-            className={`transition-all duration-200 ${errors.email ? 'border-red-400' : ''}`}
-          />
-          {errors.email && <p className="text-red-500 text-sm">{errors.email}</p>}
-        </div>
-
         <div className="grid md:grid-cols-2 gap-6">
           {/* Âge */}
           <div className="space-y-2">
@@ -459,25 +262,7 @@ export const ProfileFormSimple: React.FC<ProfileFormSimpleProps> = ({
           </p>
           {errors.interests && <p className="text-red-500 text-sm">{errors.interests}</p>}
         </div>
-
-        {/* Bouton de sauvegarde manuel (pour test) */}
-        <div className="flex justify-center pt-4">
-          <Button
-            onClick={saveData}
-            disabled={isLoading}
-            className="flex items-center gap-2"
-          >
-            {isLoading ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Sauvegarde...
-              </>
-            ) : (
-              'Sauvegarder le profil'
-            )}
-          </Button>
-        </div>
-      </motion.div>
-    </div>
+      </div>
+    </motion.div>
   );
 }; 

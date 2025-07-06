@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Upload, X, Camera, AlertCircle } from 'lucide-react';
 import { Button } from '../ui/button';
 import { profileApi } from '../../services/profileApi';
+import { API_BASE_URL } from '../../services/api';
 
 interface Photo {
   id?: number;
@@ -121,17 +122,17 @@ export const PhotoUploadSimple: React.FC<PhotoUploadSimpleProps> = ({
 
   // URL des photos (via l'API qui sert depuis la DB)
   const getPhotoUrl = (photo: Photo): string => {
-    // Vérifier que l'ID existe
     if (!photo.id) {
-      console.warn('⚠️ Photo sans ID:', photo);
-      return 'https://via.placeholder.com/200x200?text=No+ID';
+      return 'https://placehold.co/200x200?text=No+ID';
     }
-    return `http://localhost:3001/api/profile/photos/${photo.id}/image`;
+    // Correction: Construire l'URL complète
+    const baseUrl = API_BASE_URL.replace('/api', '');
+    return `${baseUrl}/api/photos/${photo.id}/image`;
   };
 
   // Gestion d'erreur d'image améliorée
   const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>, photo: Photo) => {
-    (e.target as HTMLImageElement).src = 'https://via.placeholder.com/200x200?text=Error+Loading';
+    (e.target as HTMLImageElement).src = 'https://placehold.co/200x200?text=Error';
   };
 
   return (
@@ -156,7 +157,7 @@ export const PhotoUploadSimple: React.FC<PhotoUploadSimpleProps> = ({
           <AnimatePresence>
             {displayPhotos.map((photo, index) => (
               <motion.div
-                key={photo.filename}
+                key={photo.id || photo.filename}
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.8 }}

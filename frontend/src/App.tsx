@@ -14,7 +14,7 @@ import { ProfileCompletionPageSimple } from './components/profile/ProfileComplet
 import { ProfileViewPage } from './components/profile/ProfileViewPage';
 import { ProfileEditPage } from './components/profile/ProfileEditPage';
 import { ProfilePublicPage } from './pages/ProfilePublicPage';
-import { BrowsingPage } from './pages/BrowsingPage';
+import BrowsingPage from './pages/BrowsingPage';
 import { ProfileTestPage } from './pages/ProfileTestPage';
 import { Header } from './components/layout/Header';
 

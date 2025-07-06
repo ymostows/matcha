@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { authenticateToken } from '../middleware/auth';
 import { PhotoModel } from '../models/Photo';
+import { UserModel } from '../models/User';
 import multer from 'multer';
 
 const router = Router();
@@ -15,6 +16,16 @@ const upload = multer({
 router.post('/', authenticateToken, upload.array('photos', 5), async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = (req as any).user.userId;
+
+    // --- Amélioration : Vérifier si l'utilisateur existe ---
+    const userExists = await UserModel.findById(userId);
+    if (!userExists) {
+      console.warn(`Tentative d'upload de photo pour un utilisateur inexistant: userId=${userId}`);
+      res.status(404).json({ success: false, message: 'Utilisateur non trouvé' });
+      return;
+    }
+    // --- Fin de l'amélioration ---
+
     const files = req.files as Express.Multer.File[];
     
     if (!files || files.length === 0) {
@@ -50,7 +61,9 @@ router.post('/', authenticateToken, upload.array('photos', 5), async (req: Reque
         savedPhotos.push(photo);
         
       } catch (error) {
-        console.error('Erreur sauvegarde photo:', error);
+        // --- Amélioration : Log plus détaillé ---
+        console.error(`Erreur lors de la sauvegarde d'une photo pour userId=${userId}:`, error);
+        // On ne bloque pas les autres uploads, mais on pourrait vouloir le faire
       }
     }
     

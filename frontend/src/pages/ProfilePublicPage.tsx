@@ -18,6 +18,7 @@ import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { PhotoViewer } from '../components/ui/PhotoViewer';
 import { profileApi, CompleteProfile } from '../services/profileApi';
+import { API_BASE_URL } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 
 export const ProfilePublicPage: React.FC = () => {
@@ -75,7 +76,8 @@ export const ProfilePublicPage: React.FC = () => {
   };
 
   const getPhotoUrl = (photoId: number): string => {
-    return `http://localhost:3001/api/profile/photos/${photoId}/image`;
+    const baseUrl = API_BASE_URL.replace('/api', '');
+    return `${baseUrl}/api/photos/${photoId}/image`;
   };
 
   // Ouvrir la visionneuse de photos
@@ -184,14 +186,14 @@ export const ProfilePublicPage: React.FC = () => {
                     <motion.div 
                       className="relative aspect-square bg-gray-100 rounded-2xl overflow-hidden group cursor-pointer shadow-lg hover:shadow-xl transition-all duration-300"
                       whileHover={{ scale: 1.02 }}
-                      onClick={() => openPhotoViewer(0)}
+                      onClick={() => openPhotoViewer(profile.photos?.findIndex(p => p.is_profile_picture) || 0)}
                     >
                       <img
-                        src={getPhotoUrl(profile.photos.find(p => p.is_profile_picture)?.id || profile.photos[0].id)}
+                        src={getPhotoUrl(profile.photos.find(p => p.is_profile_picture)?.id ?? profile.photos[0].id)}
                         alt={`${profile.first_name} ${profile.last_name}`}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                         onError={(e) => {
-                          (e.target as HTMLImageElement).src = 'https://via.placeholder.com/400x400?text=Photo';
+                          (e.target as HTMLImageElement).src = 'https://placehold.co/400x400?text=Photo';
                         }}
                       />
                       <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
@@ -201,8 +203,8 @@ export const ProfilePublicPage: React.FC = () => {
                       </div>
                     </motion.div>
                   ) : (
-                    <div className="aspect-square bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl flex items-center justify-center">
-                      <User className="w-20 h-20 text-gray-400" />
+                    <div className="relative aspect-square bg-gray-100 rounded-2xl flex items-center justify-center">
+                      <Camera className="w-16 h-16 text-gray-300" />
                     </div>
                   )}
                 </div>
@@ -282,52 +284,33 @@ export const ProfilePublicPage: React.FC = () => {
             </CardContent>
           </Card>
 
-          {/* Section Photos (autres que la photo de profil) */}
-          {(() => {
-            const otherPhotos = profile.photos?.filter(photo => !photo.is_profile_picture) || [];
-            return otherPhotos.length > 0 && (
-              <Card className="mb-6 glow-gentle">
-                <CardContent className="p-6">
-                  <h3 className="text-2xl font-semibold text-twilight mb-6 flex items-center gap-3">
-                    <Camera className="w-6 h-6 text-primary" />
-                    Autres photos ({otherPhotos.length})
-                  </h3>
-                  
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {otherPhotos.map((photo) => {
-                      const photoIndex = profile.photos?.findIndex(p => p.id === photo.id) || 0;
-                      return (
-                        <motion.div 
-                          key={photo.id} 
-                          className="relative aspect-square bg-gray-100 rounded-xl overflow-hidden group cursor-pointer shadow-md hover:shadow-lg transition-all duration-300"
-                          whileHover={{ scale: 1.02, y: -2 }}
-                          onClick={() => openPhotoViewer(photoIndex)}
-                        >
-                          <img
-                            src={getPhotoUrl(photo.id)}
-                            alt="Photo de galerie"
-                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src = 'https://via.placeholder.com/250x250?text=Photo';
-                            }}
-                          />
-                          
-                          {/* Overlay */}
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                            <div className="bg-white/20 backdrop-blur-sm text-white px-3 py-1 rounded-lg text-sm">
-                              Agrandir
-                            </div>
-                          </div>
-                        </motion.div>
-                      );
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })()}
-
-
+          {/* Autres photos */}
+          {profile.photos && profile.photos.length > 1 && (
+            <Card className="glow-gentle">
+              <CardContent className="p-8">
+                <h3 className="text-xl font-bold text-twilight mb-4">Galerie</h3>
+                <div className="grid grid-cols-3 gap-4">
+                  {profile.photos.map((photo, index) => (
+                    <motion.div
+                      key={photo.id}
+                      className="relative aspect-square bg-gray-100 rounded-lg overflow-hidden group cursor-pointer"
+                      whileHover={{ scale: 1.05 }}
+                      onClick={() => openPhotoViewer(index)}
+                    >
+                      <img
+                        src={getPhotoUrl(photo.id)}
+                        alt={`Photo de ${profile.first_name}`}
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = 'https://placehold.co/250x250?text=Photo';
+                        }}
+                      />
+                    </motion.div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Section Actions (si c'est notre profil) */}
           {isOwnProfile && (
