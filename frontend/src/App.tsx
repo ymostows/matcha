@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { useProfileCompletion } from './hooks/useProfileCompletion';
@@ -10,13 +10,13 @@ import ForgotPasswordPage from './components/auth/ForgotPasswordPage';
 import ResetPasswordPage from './components/auth/ResetPasswordPage';
 import UserDashboard from './components/dashboard/UserDashboard';
 import AppLayout from './components/layout/AppLayout';
-import { ProfileCompletionPageSimple } from './components/profile/ProfileCompletionPageSimple';
-import { ProfileViewPage } from './components/profile/ProfileViewPage';
-import { ProfileEditPage } from './components/profile/ProfileEditPage';
+import { ProfileCompletionPage } from './pages/ProfileCompletionPage';
+import { ProfileEditPage } from './pages/ProfileEditPage';
 import { ProfilePublicPage } from './pages/ProfilePublicPage';
 import BrowsingPage from './pages/BrowsingPage';
-import { ProfileTestPage } from './pages/ProfileTestPage';
 import { Header } from './components/layout/Header';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 // Composant pour vérifier la complétion du profil
 const ProfileCheckWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -103,17 +103,11 @@ const AppContent: React.FC = () => {
       {/* Routes protégées - Complétion de profil */}
       <Route path="/complete-profile" element={
         <ProtectedRoute>
-          <ProfileCompletionPageSimple />
+          <ProfileCompletionPage />
         </ProtectedRoute>
       } />
       
       {/* Routes protégées - Profil */}
-      <Route path="/profile-view" element={
-        <ProtectedRoute requireCompleteProfile={true}>
-          <ProfileViewPage />
-        </ProtectedRoute>
-      } />
-      
       <Route path="/profile-edit" element={
         <ProtectedRoute requireCompleteProfile={true}>
           <ProfileEditPage />
@@ -122,19 +116,6 @@ const AppContent: React.FC = () => {
       
       {/* Page de profil public (mon profil ou celui d'un autre utilisateur) */}
       <Route path="/profile" element={
-        <ProtectedRoute requireCompleteProfile={true}>
-          <ProfilePublicPage />
-        </ProtectedRoute>
-      } />
-      
-      {/* Route spéciale pour afficher le profil après création (sans vérification) */}
-      <Route path="/profile-success" element={
-        <ProtectedRoute requireCompleteProfile={false}>
-          <ProfilePublicPage />
-        </ProtectedRoute>
-      } />
-      
-      <Route path="/profile/:userId" element={
         <ProtectedRoute requireCompleteProfile={true}>
           <ProfilePublicPage />
         </ProtectedRoute>
@@ -158,13 +139,6 @@ const AppContent: React.FC = () => {
         </ProtectedRoute>
       } />
       
-      {/* Route de test pour le système de profil */}
-      <Route path="/profile-test" element={
-        <ProtectedRoute requireCompleteProfile={false}>
-          <ProfileTestPage />
-        </ProtectedRoute>
-      } />
-      
       {/* Redirection par défaut */}
       <Route path="/" element={<Navigate to="/login" replace />} />
     </Routes>
@@ -175,9 +149,23 @@ const AppContent: React.FC = () => {
 const App: React.FC = () => {
   return (
     <Router>
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+      <AuthProvider>
+        <Suspense fallback={<div className="loading-screen">Chargement...</div>}>
+          <AppContent />
+        </Suspense>
+        <ToastContainer
+          position="bottom-right"
+          autoClose={5000}
+          hideProgressBar={false}
+          newestOnTop={false}
+          closeOnClick
+          rtl={false}
+          pauseOnFocusLoss
+          draggable
+          pauseOnHover
+          theme="light"
+        />
+      </AuthProvider>
     </Router>
   );
 };

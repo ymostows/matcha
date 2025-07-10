@@ -2,7 +2,7 @@ import express, { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { UserModel } from '../models/User';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
-import { validatePassword } from '../utils/passwordValidation';
+import { validatePassword } from '../utils/validation';
 import pool from '../config/database';
 import { 
   sendVerificationEmail,
@@ -29,13 +29,12 @@ router.post('/register', async (req: Request, res: Response) => {
     
     // Validation basique
     if (!email || !username || !password || !first_name || !last_name) {
-      res.status(400).json({
+      return res.status(400).json({
         success: false,
         message: 'Tous les champs sont requis'
       });
-      return;
     }
-
+    
     // Validation de l'email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
@@ -47,13 +46,13 @@ router.post('/register', async (req: Request, res: Response) => {
     }
 
     // Validation du mot de passe sécurisé
-    const passwordValidation = validatePassword(password);
-    if (!passwordValidation.isValid) {
-      res.status(400).json({
+    const passwordErrors = validatePassword(password);
+    if (passwordErrors.length > 0) {
+      return res.status(400).json({
         success: false,
-        message: passwordValidation.message
+        message: 'Le mot de passe ne respecte pas les critères de sécurité.',
+        errors: passwordErrors
       });
-      return;
     }
     
     // Vérifier que l'utilisateur n'existe pas déjà
@@ -68,11 +67,10 @@ router.post('/register', async (req: Request, res: Response) => {
 
     const existingUsername = await UserModel.findByUsername(username);
     if (existingUsername) {
-      res.status(409).json({
+      return res.status(409).json({
         success: false,
         message: 'Ce nom d\'utilisateur est déjà pris'
       });
-      return;
     }
     
     // Créer l'utilisateur avec token de vérification
@@ -445,14 +443,14 @@ router.post('/reset-password/:token', async (req: Request, res: Response) => {
       return;
     }
 
-    // Validation du nouveau mot de passe
-    const passwordValidation = validatePassword(password);
-    if (!passwordValidation.isValid) {
-      res.status(400).json({
+    // Valider le nouveau mot de passe
+    const passwordErrors = validatePassword(password);
+    if (passwordErrors.length > 0) {
+      return res.status(400).json({
         success: false,
-        message: passwordValidation.message
+        message: 'Le nouveau mot de passe ne respecte pas les critères de sécurité.',
+        errors: passwordErrors
       });
-      return;
     }
 
     // Vérifier le token

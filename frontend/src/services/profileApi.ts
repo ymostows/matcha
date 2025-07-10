@@ -7,6 +7,8 @@ export interface ProfileData {
   sexual_orientation?: 'hetero' | 'homo' | 'bi';
   interests?: string[];
   city?: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface CompleteProfile extends ProfileData {
@@ -98,13 +100,9 @@ export const profileApi = {
     return response.profile;
   },
 
-  // Mettre à jour la géolocalisation
+  // Mettre à jour la géolocalisation via la route de profil principale
   async updateLocation(latitude: number, longitude: number, city?: string): Promise<void> {
-    await api.put<ApiResponse<void>>('/profile/location', {
-      latitude,
-      longitude,
-      city
-    });
+    await this.updateProfile({ city, latitude, longitude });
   },
 
   // Obtenir l'historique des likes reçus
@@ -147,7 +145,7 @@ export const profileApi = {
 
   // Mettre à jour les informations utilisateur (nom, prénom, email)
   async updateUserInfo(userData: UserUpdateData): Promise<any> {
-    const response = await api.put('/auth/user', userData);
+    const response = await api.put('/profile/user', userData);
     return response;
   },
 
@@ -200,18 +198,6 @@ export const profileApi = {
       }
       throw error;
     }
-  },
-
-  // Géolocalisation automatique (méthode alternative)
-  async getAutoLocation(): Promise<any> {
-    const response = await api.post('/profile/location/auto');
-    return response;
-  },
-
-  // Mise à jour manuelle de la localisation
-  async updateManualLocation(locationData: LocationUpdateData): Promise<any> {
-    const response = await api.put('/profile/location/manual', locationData);
-    return response;
   },
 
   // Liker un profil

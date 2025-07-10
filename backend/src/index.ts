@@ -14,6 +14,7 @@ import profileRoutes from './routes/profile';
 import photosRoutes from './routes/photos';
 import { sanitizeInput } from './middleware/sanitization';
 import { initializeEmailTransporter } from './config/email';
+import errorHandler from './middleware/errorHandler';
 
 // Créer l'application Express
 const app = express();
@@ -87,6 +88,9 @@ app.use('/api/profile', profileRoutes);
 
 // Routes de photos
 app.use('/api/photos', photosRoutes);
+
+// Middleware de gestion des erreurs (doit être le dernier)
+app.use(errorHandler);
 
 // Démarrer le serveur
 const startServer = async () => {

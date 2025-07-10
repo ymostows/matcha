@@ -2,23 +2,26 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Heart, Mail, Lock, Loader2, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
+import { notify } from '../../services/notificationService';
 
 interface LoginFormProps {
   onSwitchToRegister: () => void;
 }
 
 export const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister }) => {
-  const { login, isLoading, error } = useAuth();
+  const { login } = useAuth();
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
   });
   const [showPassword, setShowPassword] = useState(false);
-  const [localError, setLocalError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Gestion des changements dans les inputs
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -27,48 +30,42 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister }) => {
       ...prev,
       [name]: value
     }));
-    // Effacer les erreurs quand l'utilisateur tape
-    if (localError) setLocalError(null);
-    if (success) setSuccess(null);
+    if (error) setError(null);
   };
 
   // Validation côté client
   const validateForm = (): boolean => {
-    if (!formData.email.trim()) {
-      setLocalError('L\'email est requis');
+    if (!formData.email.trim() || !formData.email.includes('@')) {
+      setError('Veuillez entrer un email valide');
       return false;
     }
-    
-    if (!formData.email.includes('@')) {
-      setLocalError('Veuillez entrer un email valide');
-      return false;
-    }
-    
     if (!formData.password.trim()) {
-      setLocalError('Le mot de passe est requis');
+      setError('Le mot de passe est requis');
       return false;
     }
-    
     return true;
   };
 
   // Soumission du formulaire
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
     if (!validateForm()) return;
 
+    setIsLoading(true);
+    setError(null);
+
     try {
-      setLocalError(null);
       await login(formData.email, formData.password);
-      setSuccess('Connexion réussie ! Redirection...');
-      
-    } catch (error) {
-      console.error('Erreur de connexion:', error);
+      notify.success('Connexion réussie ! Vous allez être redirigé.');
+      navigate('/browsing');
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.message || 'Une erreur est survenue lors de la connexion.';
+      notify.error(errorMessage);
+      setError(errorMessage); // Met aussi à jour l'erreur locale si besoin
+    } finally {
+      setIsLoading(false);
     }
   };
-
-  const displayedError = localError || error;
 
   return (
     <motion.div 
@@ -167,26 +164,15 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister }) => {
               </div>
             </motion.div>
 
-            {/* Messages d'erreur/succès */}
-            {displayedError && (
+            {/* Messages d'erreur */}
+            {error && (
               <motion.div 
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 className="text-red-600 text-sm bg-red-50 border border-red-200 rounded-xl p-4 flex items-center gap-2"
               >
                 <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                {displayedError}
-              </motion.div>
-            )}
-            
-            {success && (
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="text-green-600 text-sm bg-green-50 border border-green-200 rounded-xl p-4 flex items-center gap-2"
-              >
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                {success}
+                {error}
               </motion.div>
             )}
 

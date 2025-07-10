@@ -37,9 +37,9 @@ export const UserDashboard: React.FC = () => {
       >
         <Card className="bg-gradient-to-r from-primary/10 via-sunset/5 to-peach/10 border-0 shadow-xl overflow-hidden relative">
           <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent"></div>
-          <CardContent className="p-8 relative">
-            <div className="flex items-center justify-between">
-              <div>
+          <CardContent className="p-6 sm:p-8 relative">
+            <div className="flex flex-col sm:flex-row items-center justify-between text-center sm:text-left">
+              <div className="mb-6 sm:mb-0">
                 <motion.h2 
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
@@ -68,7 +68,7 @@ export const UserDashboard: React.FC = () => {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.4 }}
-                  className="flex gap-3"
+                  className="flex flex-col sm:flex-row gap-3"
                 >
                   <Button className="bg-peach-gradient hover:shadow-lg transition-all duration-200">
                     <Zap className="w-4 h-4 mr-2" />
@@ -84,7 +84,7 @@ export const UserDashboard: React.FC = () => {
                 initial={{ scale: 0, rotate: -180 }}
                 animate={{ scale: 1, rotate: 0 }}
                 transition={{ delay: 0.5, type: "spring" }}
-                className="hidden md:block"
+                className="hidden sm:block"
               >
                 <div className="w-24 h-24 bg-peach-gradient rounded-full flex items-center justify-center shadow-2xl relative">
                   <Heart className="w-12 h-12 text-white" fill="currentColor" />
@@ -101,7 +101,7 @@ export const UserDashboard: React.FC = () => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
-        className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8"
+        className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 mb-8"
       >
         {[
           { icon: Heart, value: stats.likes, label: "Likes reçus", color: "text-primary", bgColor: "bg-primary/10" },
@@ -130,7 +130,7 @@ export const UserDashboard: React.FC = () => {
         ))}
       </motion.div>
 
-      <div className="grid lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         {/* Profile Section améliorée */}
         <motion.div 
           initial={{ opacity: 0, x: -20 }}
@@ -221,7 +221,7 @@ export const UserDashboard: React.FC = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4">
                 {recentMatches.map((match, index) => (
                   <motion.div
                     key={match.id}

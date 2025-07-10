@@ -5,13 +5,11 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../ui/button';
 import { Card, CardContent } from '../ui/card';
-import { ProfileFormSimple } from './ProfileFormSimple';
 import { PhotoUploadAdvanced } from './PhotoUploadAdvanced';
-import { PhotoUploadWithPreview } from './PhotoUploadWithPreview';
-import { ProfilePictureSelector } from './ProfilePictureSelector';
 import { LocationPickerSimple } from './LocationPickerSimple';
 import { profileApi } from '../../services/profileApi';
 import type { User as AuthUser } from '../../types/auth';
+import { UserInfoForm } from './UserInfoForm';
 
 interface Step {
   id: number;
@@ -130,22 +128,16 @@ export const ProfileEditPage: React.FC = () => {
 
   // Sauvegarder et terminer
   const handleFinish = async () => {
-    setIsSaving(true);
+    // La sauvegarde de la dernière étape est déjà gérée par `goToNext`.
+    // On peut donc simplement naviguer.
     try {
-      // Sauvegarder la dernière étape avant de terminer
-      if (currentStep === 1 && (window as any).savePhotoUpload) {
-        await (window as any).savePhotoUpload();
-      } else if (currentStep === 0 && (window as any).saveProfileForm) {
-        await (window as any).saveProfileForm();
-      }
-      
-      // Naviguer vers le profil public avec rechargement des données
-      navigate('/profile', { replace: true });
-      window.location.reload(); // Force le rechargement pour éviter l'écran blanc
+      // Naviguer vers le profil public avec un état pour afficher la notif
+      navigate('/profile', { 
+        replace: true,
+        state: { showSuccessToast: true } 
+      });
     } catch (error) {
       console.error('Erreur finalisation:', error);
-    } finally {
-      setIsSaving(false);
     }
   };
 
@@ -169,7 +161,6 @@ export const ProfileEditPage: React.FC = () => {
           <Button 
             variant="ghost" 
             onClick={() => navigate('/profile')}
-            className="text-twilight hover:text-primary"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Retour au profil
@@ -178,7 +169,6 @@ export const ProfileEditPage: React.FC = () => {
           <Button 
             variant="outline" 
             onClick={() => navigate('/profile')}
-            className="text-twilight hover:text-primary"
           >
             <Eye className="w-4 h-4 mr-2" />
             Voir mon profil public
@@ -248,7 +238,7 @@ export const ProfileEditPage: React.FC = () => {
               >
                 {/* Étape 0: Informations personnelles */}
                 {currentStep === 0 && (
-                  <ProfileFormSimple
+                  <UserInfoForm
                     initialData={profile}
                     onSave={() => {}}
                   />
@@ -290,9 +280,9 @@ export const ProfileEditPage: React.FC = () => {
               Précédent
             </Button>
             <Button
+              variant="default"
               onClick={goToNext}
               disabled={isSaving}
-              className="bg-gradient-to-r from-primary to-accent hover:shadow-lg"
             >
               {currentStep === steps.length - 1 ? 'Terminer' : 'Suivant'}
             </Button>

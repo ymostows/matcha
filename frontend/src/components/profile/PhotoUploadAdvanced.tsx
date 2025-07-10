@@ -58,17 +58,6 @@ export const PhotoUploadAdvanced: React.FC<PhotoUploadAdvancedProps> = ({
   const profilePicture = displayPhotos.find(p => p.is_profile_picture);
   const otherPhotos = displayPhotos.filter(p => !p.is_profile_picture);
 
-  // Exposer la fonction de sauvegarde pour ProfileEditPage
-  useEffect(() => {
-    (window as any).savePhotoUpload = async () => {
-      onSave?.();
-      return true;
-    };
-    return () => {
-      delete (window as any).savePhotoUpload;
-    };
-  }, [onSave]);
-
   // Upload des photos
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -257,23 +246,25 @@ export const PhotoUploadAdvanced: React.FC<PhotoUploadAdvancedProps> = ({
                   />
                   
                   {/* Overlay avec actions */}
-                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                    <button
+                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
+                    <Button
+                      type="button"
                       onClick={() => photo.id && setAsProfilePicture(photo.id)}
-                      className="bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg px-3 py-1 text-xs font-medium flex items-center gap-1"
-                      title="Définir comme photo de profil"
+                      className="text-white bg-black/50 hover:bg-black/80"
+                      size="sm"
                     >
-                      <Star className="w-3 h-3" />
-                      Profil
-                    </button>
-                    <button
+                      <Star className="w-4 h-4 mr-2" />
+                      Principale
+                    </Button>
+                    <Button
+                      type="button"
                       onClick={() => photo.id && removePhoto(photo.id)}
-                      className="bg-red-500 hover:bg-red-600 text-white rounded-lg px-3 py-1 text-xs font-medium flex items-center gap-1"
-                      title="Supprimer cette photo"
+                      variant="destructive"
+                      size="sm"
                     >
-                      <X className="w-3 h-3" />
-                      Suppr.
-                    </button>
+                      <X className="w-4 h-4 mr-2" />
+                      Supprimer
+                    </Button>
                   </div>
                 </motion.div>
               ))}

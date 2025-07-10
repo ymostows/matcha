@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { toast } from 'react-toastify';
 import { 
   ArrowLeft, 
   Heart, 
@@ -14,7 +15,7 @@ import {
   CheckCircle,
   Camera
 } from 'lucide-react';
-import { Card, CardContent } from '../components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { PhotoViewer } from '../components/ui/PhotoViewer';
 import { profileApi, CompleteProfile } from '../services/profileApi';
@@ -37,6 +38,17 @@ export const ProfilePublicPage: React.FC = () => {
   
   // Déterminer si on vient de créer le profil
   const isProfileCreated = location.pathname === '/profile-success';
+
+  const toastShownRef = useRef(false);
+
+  useEffect(() => {
+    if (location.state?.showSuccessToast && !toastShownRef.current) {
+      toast.success('Profil mis à jour avec succès !');
+      toastShownRef.current = true;
+      // Nettoyer l'état pour éviter que le toast ne réapparaisse
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state, navigate, location.pathname]);
 
   useEffect(() => {
     loadProfile();
@@ -138,14 +150,14 @@ export const ProfilePublicPage: React.FC = () => {
         )}
         
         {/* Header avec navigation - style cohérent */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
           <Button 
             variant="ghost" 
-            onClick={() => navigate('/dashboard')}
-            className="text-twilight hover:text-primary transition-colors duration-200"
+            onClick={() => navigate(-1)}
+            className="text-twilight hover:text-primary transition-colors duration-200 self-start"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Retour au dashboard
+            Retour
           </Button>
           
           {isOwnProfile && (
@@ -178,8 +190,8 @@ export const ProfilePublicPage: React.FC = () => {
         <div className="max-w-4xl mx-auto space-y-6">
           {/* Section Header avec info principale */}
           <Card className="mb-6 glow-gentle">
-            <CardContent className="p-8">
-              <div className="grid md:grid-cols-3 gap-8 items-start">
+            <CardContent className="p-6 sm:p-8">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8 items-start">
                 {/* Photo de profil */}
                 <div className="md:col-span-1">
                   {profile.photos && profile.photos.length > 0 ? (
@@ -213,10 +225,10 @@ export const ProfilePublicPage: React.FC = () => {
                 <div className="md:col-span-2 space-y-6">
                   {/* Nom et âge */}
                   <div>
-                    <h1 className="text-4xl font-bold text-twilight mb-2">
+                    <h1 className="text-3xl sm:text-4xl font-bold text-twilight mb-2">
                       {profile.first_name} {profile.last_name}
                     </h1>
-                    <div className="flex items-center gap-4 text-twilight/70">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 text-twilight/70">
                       <div className="flex items-center gap-2">
                         <Calendar className="w-4 h-4" />
                         <span>{profile.age} ans</span>
@@ -235,7 +247,7 @@ export const ProfilePublicPage: React.FC = () => {
                         <Heart className="w-4 h-4 text-primary" />
                         À propos
                       </h3>
-                      <p className="text-twilight/80 leading-relaxed">{profile.biography}</p>
+                      <p className="text-twilight/80 leading-relaxed break-words">{profile.biography}</p>
                     </div>
                   )}
 
@@ -284,25 +296,33 @@ export const ProfilePublicPage: React.FC = () => {
             </CardContent>
           </Card>
 
-          {/* Autres photos */}
+          {/* Section Galerie de photos */}
           {profile.photos && profile.photos.length > 1 && (
             <Card className="glow-gentle">
-              <CardContent className="p-8">
-                <h3 className="text-xl font-bold text-twilight mb-4">Galerie</h3>
-                <div className="grid grid-cols-3 gap-4">
+              <CardHeader className="flex-row justify-between items-center">
+                <CardTitle className="flex items-center gap-2">
+                  <Camera className="w-5 h-5 text-primary" />
+                  Galerie Photos ({profile.photos.length})
+                </CardTitle>
+                <CardDescription>
+                  Cliquez pour agrandir
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-4">
                   {profile.photos.map((photo, index) => (
                     <motion.div
                       key={photo.id}
-                      className="relative aspect-square bg-gray-100 rounded-lg overflow-hidden group cursor-pointer"
+                      className="aspect-square bg-gray-100 rounded-lg overflow-hidden group cursor-pointer shadow-md hover:shadow-lg transition-all duration-300"
                       whileHover={{ scale: 1.05 }}
                       onClick={() => openPhotoViewer(index)}
                     >
                       <img
                         src={getPhotoUrl(photo.id)}
                         alt={`Photo de ${profile.first_name}`}
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                         onError={(e) => {
-                          (e.target as HTMLImageElement).src = 'https://placehold.co/250x250?text=Photo';
+                          (e.target as HTMLImageElement).src = 'https://placehold.co/400x400?text=Photo';
                         }}
                       />
                     </motion.div>
@@ -312,32 +332,25 @@ export const ProfilePublicPage: React.FC = () => {
             </Card>
           )}
 
-          {/* Section Actions (si c'est notre profil) */}
-          {isOwnProfile && (
-            <Card className="mb-6 glow-gentle bg-gradient-to-r from-primary/5 to-accent/5 border-primary/20">
-              <CardContent className="p-6 text-center">
-                <h3 className="text-xl font-semibold text-twilight mb-4">
-                  Gérer mon profil
-                </h3>
-                <div className="flex flex-wrap gap-3 justify-center">
-                  <Button
-                    onClick={() => navigate('/profile-edit')}
-                    className="bg-gradient-to-r from-primary to-accent text-white hover:shadow-lg transition-all duration-200"
-                  >
-                    <User className="w-4 h-4 mr-2" />
-                    Modifier mon profil
-                  </Button>
-                  {profile.photos && profile.photos.length > 0 && (
-                    <Button
-                      onClick={() => openPhotoViewer(0)}
-                      variant="outline"
-                      className="border-primary/20 text-primary hover:bg-primary/5 hover:border-primary/30 transition-all duration-200"
-                    >
-                      <Camera className="w-4 h-4 mr-2" />
-                      Voir mes photos
-                    </Button>
-                  )}
-                </div>
+          {/* Boutons d'actions - Non flottants pour une meilleure compatibilité */}
+          {!isOwnProfile && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Heart className="w-5 h-5 text-primary" />
+                  Actions
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col sm:flex-row gap-3">
+                <Button className="w-full bg-peach-gradient shadow-lg">
+                  <Heart className="w-4 h-4 mr-2" /> Liker le profil
+                </Button>
+                <Button variant="outline" className="w-full">
+                  <MessageCircle className="w-4 h-4 mr-2" /> Envoyer un message
+                </Button>
+                <Button variant="ghost" className="w-full text-red-500 hover:bg-red-50 hover:text-red-600">
+                  Rejeter
+                </Button>
               </CardContent>
             </Card>
           )}

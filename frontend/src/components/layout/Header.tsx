@@ -1,13 +1,14 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '../ui/button';
-import { Heart, User, Home, LogOut, Search } from 'lucide-react';
+import { Heart, User, Home, LogOut, Search, Menu, X } from 'lucide-react';
 
 export const Header: React.FC = () => {
   const { user, token, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   
   const isAuthenticated = !!(user && token);
   
@@ -16,7 +17,18 @@ export const Header: React.FC = () => {
   const handleLogout = () => {
     logout();
     navigate('/login');
+    setIsMenuOpen(false);
   };
+
+  useEffect(() => {
+    setIsMenuOpen(false);
+  }, [location.pathname]);
+
+  const navLinks = [
+    { path: '/dashboard', label: 'Accueil', icon: Home },
+    { path: '/browsing', label: 'Découverte', icon: Search },
+    { path: '/profile', label: 'Mon profil', icon: User },
+  ];
 
   return (
     <header className="bg-white/95 backdrop-blur-md border-b border-gray-100/80 sticky top-0 z-50 shadow-sm">
@@ -29,105 +41,82 @@ export const Header: React.FC = () => {
           >
             <div className="w-10 h-10 bg-gradient-to-r from-primary to-accent rounded-xl flex items-center justify-center shadow-md group-hover:shadow-lg transition-all duration-300 group-hover:scale-105">
               <Heart className="w-6 h-6 text-white" fill="currentColor" />
-          </div>
+            </div>
             <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
               Matcha
-          </h1>
-        </div>
+            </h1>
+          </div>
         
           {/* Navigation selon l'état de connexion */}
           {isAuthenticated ? (
-            <div className="flex items-center gap-8">
-              {/* Navigation principale avec design uniforme */}
+            <>
+              {/* Navigation Desktop */}
               <nav className="hidden md:flex items-center gap-2">
-            <Button 
-              variant="ghost" 
-              size="sm" 
-                  onClick={() => navigate('/dashboard')}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-all duration-300 ${
-                    location.pathname === '/dashboard' 
-                      ? 'bg-gradient-to-r from-primary to-accent text-white shadow-lg hover:shadow-xl' 
-                      : 'text-twilight/70 hover:text-twilight hover:bg-gray-50 hover:shadow-md'
-                  }`}
-            >
-                  <Home className="w-4 h-4" />
-                  Accueil
-            </Button>
-
+                {navLinks.map((link) => (
+                  <Button 
+                    key={link.path}
+                    variant={location.pathname.startsWith(link.path) ? 'default' : 'ghost'}
+                    size="sm" 
+                    onClick={() => navigate(link.path)}
+                    className="flex items-center gap-2"
+                  >
+                    <link.icon className="w-4 h-4" />
+                    {link.label}
+                  </Button>
+                ))}
                 <Button
                   variant="ghost"
-                  size="sm"
-                  onClick={() => navigate('/browsing')}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-all duration-300 ${
-                    location.pathname === '/browsing' 
-                      ? 'bg-gradient-to-r from-primary to-accent text-white shadow-lg hover:shadow-xl' 
-                      : 'text-twilight/70 hover:text-twilight hover:bg-gray-50 hover:shadow-md'
-                  }`}
+                  size="sm" 
+                  onClick={handleLogout}
+                  className="flex items-center gap-2 text-red-500 hover:text-red-600 hover:bg-red-50"
                 >
-                  <Search className="w-4 h-4" />
-                  Découverte
-          </Button>
-          
-          <Button 
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => navigate('/profile')}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-all duration-300 ${
-                    location.pathname.includes('/profile') 
-                      ? 'bg-gradient-to-r from-primary to-accent text-white shadow-lg hover:shadow-xl' 
-                      : 'text-twilight/70 hover:text-twilight hover:bg-gray-50 hover:shadow-md'
-                  }`}
-                >
-                  <User className="w-4 h-4" />
-                  Mon profil
+                  <LogOut className="w-4 h-4" />
+                  Déconnexion
                 </Button>
               </nav>
 
-              {/* Menu utilisateur simplifié */}
-              <div className="flex items-center gap-4">
-                {/* Bouton déconnexion avec design uniforme */}
-                <Button
-                  variant="ghost"
-            size="sm" 
-                  onClick={handleLogout}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-red-500 hover:text-red-600 hover:bg-red-50 hover:shadow-md transition-all duration-300"
-          >
-                  <LogOut className="w-4 h-4" />
-                  <span className="hidden sm:inline">Déconnexion</span>
-          </Button>
-
-                {/* Informations utilisateur à droite */}
-                <div className="hidden sm:flex items-center gap-3 bg-gradient-to-r from-primary/5 to-accent/5 px-4 py-2 rounded-xl border border-primary/10">
-                  <div className="w-8 h-8 bg-gradient-to-r from-primary to-accent rounded-full flex items-center justify-center text-white text-sm font-bold shadow-md">
-                    {user?.first_name?.charAt(0)?.toUpperCase() || user?.username?.charAt(0)?.toUpperCase() || 'U'}
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-semibold text-twilight leading-tight">
-                      {user?.first_name} {user?.last_name}
-                    </p>
-                    <p className="text-xs text-primary font-medium">@{user?.username}</p>
-                  </div>
-                </div>
-
-                {/* Menu mobile simplifié */}
-                <div className="sm:hidden flex items-center gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleLogout}
-                    className="p-2 rounded-xl text-red-500 hover:bg-red-50"
-                  >
-                    <LogOut className="w-4 h-4" />
-                  </Button>
-                </div>
+              {/* Bouton Hamburger pour mobile */}
+              <div className="md:hidden">
+                <Button variant="ghost" size="icon" onClick={() => setIsMenuOpen(!isMenuOpen)}>
+                  {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+                </Button>
               </div>
-            </div>
+            </>
           ) : (
             // Pour les utilisateurs non connectés : header vide (juste l'espace)
             <div></div>
           )}
         </div>
       </div>
+
+      {/* Menu mobile déroulant */}
+      {isMenuOpen && (
+        <div className="md:hidden bg-white border-t border-gray-100">
+          <nav className="flex flex-col p-4 gap-2">
+            {navLinks.map((link) => (
+              <Button 
+                key={link.path}
+                variant={location.pathname.startsWith(link.path) ? 'default' : 'ghost'} 
+                size="lg"
+                onClick={() => navigate(link.path)}
+                className="flex justify-start items-center gap-4 w-full"
+              >
+                <link.icon className="w-5 h-5" />
+                <span>{link.label}</span>
+              </Button>
+            ))}
+            <Button
+              variant="ghost"
+              size="lg"
+              onClick={handleLogout}
+              className="flex justify-start items-center gap-4 w-full text-red-500 hover:text-red-600 hover:bg-red-50"
+            >
+              <LogOut className="w-5 h-5" />
+              <span>Déconnexion</span>
+            </Button>
+          </nav>
+        </div>
+      )}
     </header>
   );
 };

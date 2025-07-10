@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import type { User, AuthContextType, RegisterData } from '../types/auth';
 import apiService from '../services/api';
+import { profileApi } from '../services/profileApi';
 
 // Création du contexte
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -59,7 +60,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   /**
    * Fonction de connexion
    */
-  const login = async (email: string, password: string): Promise<void> => {
+  const login = useCallback(async (email: string, password: string): Promise<void> => {
     try {
       setIsLoading(true);
       setError(null);
@@ -81,12 +82,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   /**
    * Fonction d'inscription
    */
-  const register = async (userData: RegisterData): Promise<void> => {
+  const register = useCallback(async (userData: RegisterData): Promise<void> => {
     try {
       setIsLoading(true);
       setError(null);
@@ -107,19 +108,42 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   /**
    * Fonction de déconnexion
    */
-  const logout = (): void => {
+  const logout = useCallback((): void => {
     console.log('🚪 Déconnexion...');
     apiService.logout();
     setUser(null);
     setToken(null);
     setError(null);
     console.log('✅ Déconnexion terminée');
-  };
+  }, []);
+
+  /**
+   * Rafraîchit les données de l'utilisateur
+   */
+  const refreshUser = useCallback(async (): Promise<void> => {
+    if (!user) return;
+
+    try {
+      console.log('🔄 Rafraîchissement des données utilisateur...');
+      const profileData = await profileApi.getMyProfile();
+      
+      const updatedUser = {
+        ...user,
+        ...profileData,
+      };
+
+      setUser(updatedUser);
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      console.log('✅ Données utilisateur rafraîchies');
+    } catch (error) {
+      console.error('❌ Erreur lors du rafraîchissement des données:', error);
+    }
+  }, [user]);
 
   // Valeur du contexte
   const contextValue: AuthContextType = {
@@ -128,6 +152,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     login,
     register,
     logout,
+    refreshUser,
     isLoading,
     error,
   };
