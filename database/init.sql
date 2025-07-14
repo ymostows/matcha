@@ -8,18 +8,7 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
--- TODO: Les tables seront créées lors des prochaines étapes
--- Tables prévues : users, profiles, photos, matches, messages, notifications, etc.
-
--- Exemple de structure (sera détaillée plus tard) :
--- CREATE TABLE users (...);
--- CREATE TABLE profiles (...);
-
--- Insertion de données de test (optionnel)
--- INSERT INTO users VALUES (...);
-
--- Extensions nécessaires
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+-- Tables de la base de données Matcha
 
 -- Table des utilisateurs
 CREATE TABLE IF NOT EXISTS users (
