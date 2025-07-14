@@ -57,7 +57,6 @@ const BrowsingPage: React.FC = () => {
         setProfiles(fetchedProfiles);
       } catch (err) {
         setError("Impossible de charger les profils pour le moment.");
-        console.error(err);
       } finally {
         setIsLoading(false);
       }

@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { motion } from 'framer-motion';
 import { Loader2, Save, User, Camera, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -26,7 +25,6 @@ export const ProfileEditPage: React.FC = () => {
         const profileData = await profileApi.getMyProfile();
         setProfile(profileData);
       } catch (error) {
-        console.error('Erreur chargement profil:', error);
         setError('Impossible de charger votre profil.');
       } finally {
         setIsLoading(false);
@@ -89,7 +87,6 @@ export const ProfileEditPage: React.FC = () => {
       setSuccessMessage('Votre profil a été mis à jour avec succès !');
       
     } catch (err: any) {
-      console.error("Erreur de sauvegarde:", err);
       setError(err.response?.data?.message || 'Une erreur est survenue lors de la sauvegarde.');
     } finally {
       setIsSaving(false);

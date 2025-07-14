@@ -45,7 +45,7 @@ const EmailVerificationPage: React.FC = () => {
             setMessage(message || 'Erreur lors de la vérification');
           }
         }
-      } catch (error: any) {
+      } catch {
         setStatus('error');
         setMessage('Erreur de connexion au serveur. Veuillez réessayer.');
       }

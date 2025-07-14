@@ -194,7 +194,6 @@ export const profileApi = {
           };
         }
       } catch (fallbackError) {
-        console.error('Erreur service IP fallback:', fallbackError);
       }
       throw error;
     }

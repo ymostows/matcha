@@ -120,8 +120,8 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) =
         onSwitchToLogin();
       }, 2000);
       
-    } catch (error) {
-      console.error('Erreur d\'inscription:', error);
+    } catch {
+      // Erreur gérée par le contexte d'authentification
     }
   };
 

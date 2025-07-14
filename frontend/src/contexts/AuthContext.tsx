@@ -38,12 +38,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           // Restaurer la session depuis le localStorage
           setToken(savedToken);
           setUser(savedUser);
-          console.log('✅ Session restaurée avec succès');
         } else {
-          console.log('ℹ️ Aucune session sauvegardée');
         }
       } catch (error) {
-        console.error('❌ Erreur lors de l\'initialisation auth:', error);
         setError('Erreur lors de l\'initialisation');
         // En cas d'erreur, nettoyer
         apiService.logout();
@@ -70,13 +67,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (response.success && response.token && response.user) {
         setToken(response.token);
         setUser(response.user);
-        console.log('✅ Connexion réussie');
       } else {
         throw new Error(response.message || 'Erreur de connexion');
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Erreur de connexion';
-      console.error('❌ Erreur de connexion:', errorMessage);
       setError(errorMessage);
       throw error;
     } finally {
@@ -98,11 +93,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         throw new Error(response.message || 'Erreur lors de l\'inscription');
       }
 
-      console.log('✅ Inscription réussie');
       
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Erreur d\'inscription';
-      console.error('❌ Erreur d\'inscription:', errorMessage);
       setError(errorMessage);
       throw error;
     } finally {
@@ -114,12 +107,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
    * Fonction de déconnexion
    */
   const logout = useCallback((): void => {
-    console.log('🚪 Déconnexion...');
     apiService.logout();
     setUser(null);
     setToken(null);
     setError(null);
-    console.log('✅ Déconnexion terminée');
   }, []);
 
   /**
@@ -129,7 +120,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (!user) return;
 
     try {
-      console.log('🔄 Rafraîchissement des données utilisateur...');
       const profileData = await profileApi.getMyProfile();
       
       const updatedUser = {
@@ -139,9 +129,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       setUser(updatedUser);
       localStorage.setItem('user', JSON.stringify(updatedUser));
-      console.log('✅ Données utilisateur rafraîchies');
     } catch (error) {
-      console.error('❌ Erreur lors du rafraîchissement des données:', error);
     }
   }, [user]);
 

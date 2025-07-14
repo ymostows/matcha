@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { User, Heart, Plus, X } from 'lucide-react';
+import { User, Plus, X } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
@@ -28,7 +28,7 @@ export const UserInfoForm: React.FC<UserInfoFormProps> = ({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [customInterest, setCustomInterest] = useState('');
 
-  const handleChange = (field: keyof EditableProfileData, value: any) => {
+  const handleChange = (field: keyof EditableProfileData, value: string | number | string[] | undefined) => {
     onDataChange({ [field]: value });
     if (errors[field]) {
       setErrors(prev => {

@@ -51,7 +51,6 @@ export const ProfileCompletionPage: React.FC = () => {
         const profileData = await profileApi.getMyProfile();
         setProfile(profileData);
       } catch (error) {
-        console.log('Nouveau profil à créer, initialisation.');
         setProfile({}); // Initialiser comme objet vide si pas de profil
       } finally {
         setIsLoading(false);
@@ -92,7 +91,6 @@ export const ProfileCompletionPage: React.FC = () => {
       
       return true;
     } catch (error) {
-      console.error('Erreur lors de la sauvegarde complète du profil:', error);
       setCompletionError("Une erreur est survenue lors de la sauvegarde. Veuillez réessayer.");
       return false;
     } finally {

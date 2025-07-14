@@ -69,7 +69,6 @@ export const ProfilePublicPage: React.FC = () => {
       
       setProfile(profileData);
     } catch (error) {
-      console.error('Erreur chargement profil:', error);
       setError('Profil non trouvé');
     } finally {
       setIsLoading(false);
@@ -242,12 +241,20 @@ export const ProfilePublicPage: React.FC = () => {
 
                   {/* Biographie */}
                   {profile.biography && (
-                    <div className="bg-gray-50 rounded-xl p-4">
-                      <h3 className="font-semibold text-twilight mb-2 flex items-center gap-2">
+                    <div className="bg-gray-50 rounded-xl p-4 sm:p-6">
+                      <h3 className="font-semibold text-twilight mb-3 flex items-center gap-2">
                         <Heart className="w-4 h-4 text-primary" />
                         À propos
                       </h3>
-                      <p className="text-twilight/80 leading-relaxed break-words">{profile.biography}</p>
+                      <div className="text-twilight/80 leading-relaxed break-words overflow-hidden">
+                        <p className={`
+                          ${profile.biography.length > 200 ? 'text-sm sm:text-base' : 'text-base'}
+                          ${profile.biography.length > 500 ? 'leading-snug' : 'leading-relaxed'}
+                          whitespace-pre-wrap
+                        `}>
+                          {profile.biography}
+                        </p>
+                      </div>
                     </div>
                   )}
 

@@ -3,7 +3,6 @@ import { motion } from 'framer-motion';
 import { MapPin, Navigation, Globe, Loader2 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
-import { profileApi } from '../../services/profileApi';
 
 interface LocationPickerSimpleProps {
   initialLocation?: {
@@ -12,7 +11,6 @@ interface LocationPickerSimpleProps {
     city?: string;
   };
   onLocationChange: (location: { latitude: number | null; longitude: number | null; city: string }) => void;
-  onSave?: () => void;
   className?: string;
 }
 
@@ -26,7 +24,6 @@ interface LocationData {
 export const LocationPickerSimple: React.FC<LocationPickerSimpleProps> = ({
   initialLocation,
   onLocationChange,
-  onSave,
   className
 }) => {
   const [location, setLocation] = useState<LocationData | null>(
@@ -54,92 +51,127 @@ export const LocationPickerSimple: React.FC<LocationPickerSimpleProps> = ({
     }
   }, [location, manualCity, onLocationChange]);
 
-  // Fonction pour utiliser Paris par défaut
-  const useParisDefault = () => {
-    console.log('🌍 Utilisation de Paris par défaut');
-    const newLoc = {
-      latitude: 48.8566,
-      longitude: 2.3522,
-      city: 'Paris, France',
-      method: 'manual' as const
-    };
-    setLocation(newLoc);
-    setManualCity('Paris, France');
-    setError(null);
-  };
+  // Plus de vérification automatique des permissions au chargement
+  // L'utilisateur doit décider lui-même d'utiliser la géolocalisation
 
-  // Détection GPS simplifiée
+
+  // Détection GPS simplifiée (basée sur le test qui fonctionne)
   const detectGPSLocation = () => {
     if (!navigator.geolocation) {
-      console.log('❌ Géolocalisation non supportée');
-      useParisDefault();
+      setError("Votre navigateur ne supporte pas la géolocalisation.");
       return;
     }
 
     setIsDetecting('gps');
     setError(null);
-    console.log('🌍 Tentative de géolocalisation GPS...');
 
     navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        try {
-          const { latitude, longitude } = position.coords;
-          console.log('✅ Position GPS obtenue:', latitude, longitude);
-          
-          // Juste utiliser les coordonnées, sans géocodage compliqué
-          setLocation({
-            latitude,
-            longitude,
-            city: `Position GPS (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`,
-            method: 'gps'
-          });
-          setManualCity(`Position GPS (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`);
-          console.log('✅ Géolocalisation GPS réussie');
-        } catch (error) {
-          console.error('Erreur traitement GPS:', error);
-          useParisDefault();
-        }
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        
+        setLocation({
+          latitude,
+          longitude,
+          city: `Position GPS (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`,
+          method: 'gps'
+        });
+        setManualCity(`Position GPS (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`);
         setIsDetecting(false);
       },
       (error) => {
-        console.log('❌ Géolocalisation refusée ou échouée:', error.message);
         setIsDetecting(false);
-        setError("Permission de géolocalisation refusée. Essayez une autre méthode ou entrez votre ville manuellement.");
+        
+        if (error.code === 1) {
+          setError("Permission refusée. Cliquez sur l'icône 🔒 dans la barre d'adresse pour autoriser la géolocalisation.");
+        } else if (error.code === 2) {
+          setError("Position indisponible. Vérifiez votre connexion.");
+        } else if (error.code === 3) {
+          setError("Délai d'attente dépassé. Réessayez.");
+        } else {
+          setError("Erreur de géolocalisation. Essayez une autre méthode.");
+        }
       },
       {
-        enableHighAccuracy: false, // Moins strict
-        timeout: 5000, // Plus court
-        maximumAge: 600000 // 10 minutes
+        enableHighAccuracy: false,
+        timeout: 10000,
+        maximumAge: 0
       }
     );
   };
 
-  // Détection par IP simplifiée
+  // Détection par IP améliorée
   const detectIPLocation = async () => {
     setIsDetecting('ip');
     setError(null);
-    console.log('🌐 Tentative géolocalisation IP...');
 
     try {
-      // Utiliser un service IP simple et fiable
-      const response = await fetch('http://ip-api.com/json/');
-      const data = await response.json();
+      // Essayer plusieurs services IP en fallback
+      let data = null;
       
-      if (data.status === 'success' && data.lat && data.lon) {
-        console.log('✅ Géolocalisation IP réussie:', data.city, data.country);
-        setLocation({
-          latitude: data.lat,
-          longitude: data.lon,
-          city: `${data.city}, ${data.country}`,
-          method: 'ip'
-        });
-        setManualCity(`${data.city}, ${data.country}`);
-      } else {
-        throw new Error('Service IP failed');
+      // Service 1: ipapi.co (HTTPS)
+      try {
+        const response = await fetch('https://ipapi.co/json/');
+        data = await response.json();
+        if (data.latitude && data.longitude) {
+          setLocation({
+            latitude: data.latitude,
+            longitude: data.longitude,
+            city: `${data.city}, ${data.country_name}`,
+            method: 'ip'
+          });
+          setManualCity(`${data.city}, ${data.country_name}`);
+          setIsDetecting(false);
+          return;
+        }
+      } catch {
+        // Fallback au service 2
       }
-    } catch (error) {
-      console.log('❌ Géolocalisation IP échouée, utilisation de Paris');
-      useParisDefault();
+      
+      // Service 2: ip-api.com (HTTP, mais plus fiable)
+      try {
+        const response = await fetch('http://ip-api.com/json/');
+        data = await response.json();
+        if (data.status === 'success' && data.lat && data.lon) {
+          setLocation({
+            latitude: data.lat,
+            longitude: data.lon,
+            city: `${data.city}, ${data.country}`,
+            method: 'ip'
+          });
+          setManualCity(`${data.city}, ${data.country}`);
+          setIsDetecting(false);
+          return;
+        }
+      } catch {
+        // Fallback au service 3
+      }
+      
+      // Service 3: ipify + ipapi fallback
+      try {
+        const ipResponse = await fetch('https://api.ipify.org?format=json');
+        const ipData = await ipResponse.json();
+        const geoResponse = await fetch(`https://ipapi.co/${ipData.ip}/json/`);
+        const geoData = await geoResponse.json();
+        
+        if (geoData.latitude && geoData.longitude) {
+          setLocation({
+            latitude: geoData.latitude,
+            longitude: geoData.longitude,
+            city: `${geoData.city}, ${geoData.country_name}`,
+            method: 'ip'
+          });
+          setManualCity(`${geoData.city}, ${geoData.country_name}`);
+          setIsDetecting(false);
+          return;
+        }
+      } catch {
+        // Tous les services ont échoué
+      }
+      
+      throw new Error('Tous les services de géolocalisation IP ont échoué');
+      
+    } catch {
+      setError("Impossible de déterminer votre position par IP. Utilisez le GPS ou saisissez votre ville manuellement.");
     } finally {
       setIsDetecting(false);
     }
@@ -151,6 +183,7 @@ export const LocationPickerSimple: React.FC<LocationPickerSimpleProps> = ({
     setLocation(null); // Reset coordinates
     setError(null);
   };
+
 
   return (
     <div className={`space-y-6 ${className}`}>
@@ -183,17 +216,38 @@ export const LocationPickerSimple: React.FC<LocationPickerSimpleProps> = ({
       )}
 
       {/* Boutons d'action */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Détection GPS */}
-        <Button onClick={detectGPSLocation} disabled={isDetecting !== false} size="lg" className="flex items-center justify-center gap-2">
-          {isDetecting === 'gps' ? <Loader2 className="animate-spin" /> : <Navigation />}
-          Position Précise (GPS)
-        </Button>
-        {/* Détection IP */}
-        <Button onClick={detectIPLocation} disabled={isDetecting !== false} variant="outline" size="lg" className="flex items-center justify-center gap-2">
-          {isDetecting === 'ip' ? <Loader2 className="animate-spin" /> : <Globe />}
-          Position Approximative (IP)
-        </Button>
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Détection GPS */}
+          <div className="space-y-2">
+            <Button onClick={detectGPSLocation} disabled={isDetecting !== false} size="lg" className="w-full flex items-center justify-center gap-2">
+              {isDetecting === 'gps' ? <Loader2 className="animate-spin" /> : <Navigation />}
+              Position Précise (GPS)
+            </Button>
+            <div className="text-xs text-gray-500 text-center">
+              💡 Recommandé pour une localisation précise
+            </div>
+          </div>
+          
+          {/* Détection IP */}
+          <div className="space-y-2">
+            <Button onClick={detectIPLocation} disabled={isDetecting !== false} variant="outline" size="lg" className="w-full flex items-center justify-center gap-2">
+              {isDetecting === 'ip' ? <Loader2 className="animate-spin" /> : <Globe />}
+              Position Approximative (IP)
+            </Button>
+            <div className="text-xs text-gray-500 text-center">
+              🌍 Fonctionne toujours, moins précis
+            </div>
+          </div>
+        </div>
+        
+        {/* Instructions d'aide pour GPS */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
+          <div className="font-medium mb-1">💡 Astuce :</div>
+          <div className="text-xs">
+            Si le GPS ne fonctionne pas, cliquez sur l'icône 🔒 dans la barre d'adresse pour autoriser la géolocalisation.
+          </div>
+        </div>
       </div>
 
       {/* Séparateur */}

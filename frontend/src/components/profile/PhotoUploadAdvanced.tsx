@@ -13,13 +13,11 @@ interface Photo {
 interface PhotoUploadAdvancedProps {
   photos: Photo[];
   onPhotosChange: (photos: Photo[]) => void;
-  onSave?: () => void;
 }
 
 export const PhotoUploadAdvanced: React.FC<PhotoUploadAdvancedProps> = ({ 
   photos, 
-  onPhotosChange,
-  onSave
+  onPhotosChange
 }) => {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -35,7 +33,7 @@ export const PhotoUploadAdvanced: React.FC<PhotoUploadAdvancedProps> = ({
         
         setCurrentPhotos(realPhotos);
         onPhotosChange(realPhotos);
-      } catch (error) {
+      } catch {
         setCurrentPhotos([]);
       }
     };
@@ -46,14 +44,6 @@ export const PhotoUploadAdvanced: React.FC<PhotoUploadAdvancedProps> = ({
   // Utiliser currentPhotos au lieu de photos directement
   const displayPhotos = currentPhotos.length > 0 ? currentPhotos : photos;
   
-  // Debug : logs pour comprendre l'état des photos
-  // console.log('🔍 PhotoUploadAdvanced render:', {
-  //   'currentPhotos.length': currentPhotos.length,
-  //   'photos.length': photos.length,
-  //   'displayPhotos.length': displayPhotos.length,
-  //   'currentPhotos': currentPhotos.map(p => ({ id: p.id, filename: p.filename })),
-  //   'displayPhotos': displayPhotos.map(p => ({ id: p.id, filename: p.filename }))
-  // });
   
   const profilePicture = displayPhotos.find(p => p.is_profile_picture);
   const otherPhotos = displayPhotos.filter(p => !p.is_profile_picture);
@@ -117,8 +107,7 @@ export const PhotoUploadAdvanced: React.FC<PhotoUploadAdvancedProps> = ({
       const newPhotos = displayPhotos.filter(p => p.id !== photoId);
       setCurrentPhotos(newPhotos);
       onPhotosChange(newPhotos);
-    } catch (error) {
-      console.error('Erreur suppression:', error);
+    } catch {
       setUploadError('Erreur lors de la suppression');
     }
   };
@@ -132,8 +121,7 @@ export const PhotoUploadAdvanced: React.FC<PhotoUploadAdvancedProps> = ({
       const updatedProfile = await profileApi.getMyProfile();
       setCurrentPhotos(updatedProfile.photos || []);
       onPhotosChange(updatedProfile.photos || []);
-    } catch (error) {
-      console.error('Erreur définition photo de profil:', error);
+    } catch {
       setUploadError('Erreur lors de la définition de la photo de profil');
     }
   };

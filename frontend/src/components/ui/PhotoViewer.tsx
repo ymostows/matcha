@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ChevronLeft, ChevronRight, Star, Crown } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Crown } from 'lucide-react';
 import { Button } from './button';
 
 interface Photo {
