@@ -2,6 +2,8 @@ import { Router, Request, Response } from 'express';
 import { authenticateToken } from '../middleware/auth';
 import { ProfileModel } from '../models/Profile';
 import { UserModel } from '../models/User';
+import pool from '../config/database';
+import { createNotification, NotificationType } from './notifications';
 
 const router = Router();
 
@@ -176,6 +178,626 @@ function validateUserData(data: any): string[] {
   }
   
   return errors;
+}
+
+// GET /api/profile/browse - Obtenir les profils suggérés
+router.get('/browse', authenticateToken, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = (req as any).user.userId;
+    const { 
+      sortBy = 'distance', 
+      sortOrder = 'asc',
+      ageMin, 
+      ageMax,
+      maxDistance = 50,
+      minFameRating = 0,
+      maxFameRating = 100,
+      commonTags = []
+    } = req.query;
+
+    // Obtenir le profil de l'utilisateur actuel
+    const currentUserProfile = await ProfileModel.findByUserId(userId);
+    if (!currentUserProfile) {
+      res.status(400).json({ 
+        success: false, 
+        message: 'Profil non trouvé. Veuillez compléter votre profil.' 
+      });
+      return;
+    }
+
+    // Définir l'orientation par défaut comme bisexuelle si non spécifiée
+    const userOrientation = currentUserProfile.sexual_orientation || 'bi';
+    const userGender = currentUserProfile.gender;
+
+    // Déterminer les genres à afficher selon l'orientation
+    let targetGenders: string[] = [];
+    if (userOrientation === 'hetero') {
+      targetGenders = userGender === 'homme' ? ['femme'] : ['homme'];
+    } else if (userOrientation === 'homo') {
+      targetGenders = [userGender || 'homme'];
+    } else { // bi ou undefined
+      targetGenders = ['homme', 'femme'];
+    }
+
+    // Construire la requête de base
+    let query = `
+      SELECT
+        u.id, u.id as user_id, u.username, u.first_name, u.last_name, u.last_seen,
+        p.biography, p.age, p.gender, p.sexual_orientation, 
+        COALESCE(p.interests, '{}') as interests,
+        p.location_lat, p.location_lng, p.city, p.fame_rating,
+        (
+          CASE 
+            WHEN p.interests IS NOT NULL AND array_length(p.interests, 1) > 0 AND $1::text[] IS NOT NULL AND array_length($1::text[], 1) > 0
+            THEN (
+              SELECT COUNT(*) 
+              FROM unnest(p.interests) AS interest 
+              WHERE interest = ANY($1::text[])
+            )
+            ELSE 0
+          END
+        ) AS common_tags_count,
+        (
+          CASE 
+            WHEN p.location_lat IS NOT NULL AND p.location_lng IS NOT NULL 
+                 AND $2::numeric IS NOT NULL AND $3::numeric IS NOT NULL
+            THEN 
+              6371 * acos(
+                LEAST(1.0, 
+                  cos(radians($2::numeric)) * cos(radians(p.location_lat)) * 
+                  cos(radians(p.location_lng) - radians($3::numeric)) + 
+                  sin(radians($2::numeric)) * sin(radians(p.location_lat))
+                )
+              )
+            ELSE 999999
+          END
+        ) AS distance_km,
+        (
+          SELECT COALESCE(json_agg(
+            json_build_object(
+              'id', ph.id,
+              'filename', ph.filename,
+              'is_profile_picture', ph.is_profile_picture
+            ) ORDER BY ph.is_profile_picture DESC, ph.upload_date ASC
+          ), '[]'::json)
+          FROM photos ph 
+          WHERE ph.user_id = u.id
+        ) AS photos
+      FROM users u
+      JOIN profiles p ON u.id = p.user_id
+      WHERE u.id != $4 
+        AND u.is_verified = true
+        AND p.age IS NOT NULL
+        AND p.gender IS NOT NULL
+        AND p.gender = ANY($5)
+        AND NOT EXISTS (
+          SELECT 1 FROM likes l 
+          WHERE l.liker_id = $4 AND l.liked_id = u.id
+        )
+    `;
+
+    let paramIndex = 6;
+    const userInterests = currentUserProfile.interests && currentUserProfile.interests.length > 0 
+      ? currentUserProfile.interests 
+      : null;
+    
+    const params: any[] = [
+      userInterests,
+      currentUserProfile.location_lat || null,
+      currentUserProfile.location_lng || null,
+      userId,
+      targetGenders
+    ];
+
+    // Ajouter les filtres
+    if (ageMin) {
+      query += ` AND p.age >= $${paramIndex}`;
+      params.push(parseInt(ageMin as string));
+      paramIndex++;
+    }
+
+    if (ageMax) {
+      query += ` AND p.age <= $${paramIndex}`;
+      params.push(parseInt(ageMax as string));
+      paramIndex++;
+    }
+
+    if (minFameRating) {
+      query += ` AND p.fame_rating >= $${paramIndex}`;
+      params.push(parseInt(minFameRating as string));
+      paramIndex++;
+    }
+
+    if (maxFameRating) {
+      query += ` AND p.fame_rating <= $${paramIndex}`;
+      params.push(parseInt(maxFameRating as string));
+      paramIndex++;
+    }
+
+    if (Array.isArray(commonTags) && commonTags.length > 0) {
+      query += ` AND p.interests IS NOT NULL AND p.interests && $${paramIndex}::text[]`;
+      params.push(commonTags);
+      paramIndex++;
+    }
+
+    // Ajouter le filtre de distance
+    if (maxDistance && currentUserProfile.location_lat && currentUserProfile.location_lng) {
+      query += ` AND (
+        6371 * acos(
+          cos(radians($2::numeric)) * cos(radians(p.location_lat)) * 
+          cos(radians(p.location_lng) - radians($3::numeric)) + 
+          sin(radians($2::numeric)) * sin(radians(p.location_lat))
+        )
+      ) <= $${paramIndex}`;
+      params.push(parseFloat(maxDistance as string));
+      paramIndex++;
+    }
+
+    // Ajouter le tri
+    let orderClause = '';
+    switch (sortBy) {
+      case 'age':
+        orderClause = `ORDER BY p.age ${sortOrder}`;
+        break;
+      case 'fame_rating':
+        orderClause = `ORDER BY p.fame_rating ${sortOrder}`;
+        break;
+      case 'common_tags':
+        orderClause = `ORDER BY common_tags_count ${sortOrder}, distance_km ASC`;
+        break;
+      case 'distance':
+      default:
+        orderClause = `ORDER BY distance_km ${sortOrder}`;
+        break;
+    }
+
+    query += ` ${orderClause} LIMIT 50`;
+
+    const result = await pool.query(query, params);
+    
+    res.json({
+      success: true,
+      profiles: result.rows,
+      total: result.rows.length
+    });
+
+  } catch (error) {
+    console.error('Erreur récupération profils:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erreur serveur' 
+    });
+  }
+});
+
+// GET /api/profile/:userId - Obtenir un profil public par ID et enregistrer la visite
+router.get('/:userId', authenticateToken, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const visitorId = (req as any).user.userId;
+    const targetUserId = parseInt(req.params.userId);
+
+    if (isNaN(targetUserId)) {
+      res.status(400).json({ 
+        success: false, 
+        message: 'ID utilisateur invalide' 
+      });
+      return;
+    }
+
+    // Ne pas permettre de voir son propre profil via cette route
+    if (visitorId === targetUserId) {
+      res.status(400).json({ 
+        success: false, 
+        message: 'Utilisez la route /profile pour votre propre profil' 
+      });
+      return;
+    }
+
+    // Obtenir le profil complet
+    const profile = await ProfileModel.findCompleteProfile(targetUserId);
+    
+    if (!profile) {
+      res.status(404).json({ 
+        success: false, 
+        message: 'Profil non trouvé' 
+      });
+      return;
+    }
+
+    // Enregistrer la visite (ne pas enregistrer si c'est une visite répétée dans la même session/jour)
+    const client = await pool.connect();
+    let isNewVisit = false;
+    try {
+      const result = await client.query(`
+        INSERT INTO profile_visits (visitor_id, visited_id, visited_at)
+        VALUES ($1, $2, CURRENT_TIMESTAMP)
+        ON CONFLICT (visitor_id, visited_id, DATE(visited_at)) 
+        DO UPDATE SET visited_at = CURRENT_TIMESTAMP
+        RETURNING (xmax = 0) AS is_new_visit
+      `, [visitorId, targetUserId]);
+
+      isNewVisit = result.rows[0]?.is_new_visit;
+
+      // Mettre à jour le fame rating du profil visité
+      await updateFameRating(targetUserId, client);
+    } finally {
+      client.release();
+    }
+
+    // Créer une notification pour la visite (seulement si c'est une nouvelle visite)
+    if (isNewVisit) {
+      const visitorProfile = await ProfileModel.findCompleteProfile(visitorId);
+      await createNotification(
+        targetUserId,
+        NotificationType.VISIT,
+        `👁️ ${visitorProfile?.first_name} a visité votre profil`,
+        { userId: visitorId, profileName: visitorProfile?.first_name }
+      );
+    }
+    
+    res.json({ 
+      success: true, 
+      profile 
+    });
+  } catch (error) {
+    console.error('Erreur récupération profil:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erreur serveur' 
+    });
+  }
+});
+
+// POST /api/profile/like - Liker un profil
+router.post('/like', authenticateToken, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = (req as any).user.userId;
+    const { targetUserId, isLike } = req.body;
+
+    if (!targetUserId || typeof isLike !== 'boolean') {
+      res.status(400).json({ 
+        success: false, 
+        message: 'Données manquantes' 
+      });
+      return;
+    }
+
+    // Vérifier que l'utilisateur cible existe
+    const targetUser = await UserModel.findById(targetUserId);
+    if (!targetUser) {
+      res.status(404).json({ 
+        success: false, 
+        message: 'Utilisateur non trouvé' 
+      });
+      return;
+    }
+
+    // Vérifier que l'utilisateur qui like a au moins une photo de profil
+    const userPhotosResult = await pool.query(
+      'SELECT COUNT(*) as photo_count FROM photos WHERE user_id = $1',
+      [userId]
+    );
+    
+    if (parseInt(userPhotosResult.rows[0].photo_count) === 0) {
+      res.status(400).json({ 
+        success: false, 
+        message: 'Vous devez avoir au moins une photo de profil pour liker.' 
+      });
+      return;
+    }
+
+    const client = await pool.connect();
+    let isMatch = false;
+    try {
+      // Insérer ou mettre à jour le like
+      await client.query(`
+        INSERT INTO likes (liker_id, liked_id, is_like)
+        VALUES ($1, $2, $3)
+        ON CONFLICT (liker_id, liked_id) 
+        DO UPDATE SET is_like = $3, created_at = CURRENT_TIMESTAMP
+      `, [userId, targetUserId, isLike]);
+
+      // Mettre à jour le fame rating de l'utilisateur cible
+      await updateFameRating(targetUserId, client);
+
+      // Vérifier s'il y a match (si les deux se sont likés)
+      if (isLike) {
+        const mutualLikeResult = await client.query(`
+          SELECT 1 FROM likes 
+          WHERE liker_id = $1 AND liked_id = $2 AND is_like = true
+        `, [targetUserId, userId]);
+
+        if (mutualLikeResult.rows.length > 0) {
+          isMatch = true;
+          // Créer le match
+          await client.query(`
+            INSERT INTO matches (user1_id, user2_id)
+            VALUES ($1, $2)
+            ON CONFLICT (user1_id, user2_id) DO NOTHING
+          `, [Math.min(userId, targetUserId), Math.max(userId, targetUserId)]);
+        }
+      }
+
+      res.json({
+        success: true,
+        message: isLike ? 'Profil liké' : 'Profil disliké',
+        isMatch
+      });
+
+    } finally {
+      client.release();
+    }
+
+    // Créer les notifications après avoir relâché la connexion
+    if (isLike) {
+      // Obtenir les infos de l'utilisateur qui a liké
+      const likerProfile = await ProfileModel.findCompleteProfile(userId);
+      
+      if (isMatch) {
+        // Notification de match pour les deux utilisateurs
+        await createNotification(
+          targetUserId,
+          NotificationType.MATCH,
+          `🎉 Vous avez un nouveau match avec ${likerProfile?.first_name}!`,
+          { userId: userId, profileName: likerProfile?.first_name }
+        );
+        
+        await createNotification(
+          userId,
+          NotificationType.MATCH,
+          `🎉 Vous avez un nouveau match avec ${targetUser.first_name}!`,
+          { userId: targetUserId, profileName: targetUser.first_name }
+        );
+      } else {
+        // Notification de like simple
+        await createNotification(
+          targetUserId,
+          NotificationType.LIKE,
+          `❤️ ${likerProfile?.first_name} a liké votre profil!`,
+          { userId: userId, profileName: likerProfile?.first_name }
+        );
+      }
+    }
+
+  } catch (error) {
+    console.error('Erreur like profil:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erreur serveur' 
+    });
+  }
+});
+
+// GET /api/profile/liked - Obtenir les profils likés par l'utilisateur
+router.get('/liked', authenticateToken, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = (req as any).user.userId;
+    const limit = parseInt(req.query.limit as string) || 20;
+    const offset = parseInt(req.query.offset as string) || 0;
+
+    const query = `
+      SELECT
+        u.id, u.username, u.first_name, u.last_name, u.last_seen,
+        p.biography, p.age, p.gender, p.sexual_orientation, 
+        COALESCE(p.interests, '{}') as interests,
+        p.location_lat, p.location_lng, p.city, p.fame_rating,
+        l.created_at as liked_at,
+        CASE WHEN m.user1_id IS NOT NULL THEN true ELSE false END as is_match,
+        (
+          SELECT COALESCE(json_agg(
+            json_build_object(
+              'id', ph.id,
+              'filename', ph.filename,
+              'is_profile_picture', ph.is_profile_picture
+            ) ORDER BY ph.is_profile_picture DESC, ph.upload_date ASC
+          ), '[]'::json)
+          FROM photos ph 
+          WHERE ph.user_id = u.id
+        ) AS photos
+      FROM users u
+      JOIN profiles p ON u.id = p.user_id
+      JOIN likes l ON l.liked_id = u.id AND l.liker_id = $1 AND l.is_like = true
+      LEFT JOIN matches m ON (m.user1_id = $1 AND m.user2_id = u.id) OR (m.user1_id = u.id AND m.user2_id = $1)
+      WHERE u.is_verified = true
+      ORDER BY l.created_at DESC
+      LIMIT $2 OFFSET $3
+    `;
+
+    const result = await pool.query(query, [userId, limit, offset]);
+    
+    res.json({
+      success: true,
+      profiles: result.rows,
+      total: result.rows.length
+    });
+
+  } catch (error) {
+    console.error('Erreur récupération profils likés:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erreur serveur' 
+    });
+  }
+});
+
+// DELETE /api/profile/like/:userId - Unlike/annuler un like
+router.delete('/like/:userId', authenticateToken, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = (req as any).user.userId;
+    const targetUserId = parseInt(req.params.userId);
+
+    if (isNaN(targetUserId)) {
+      res.status(400).json({ 
+        success: false, 
+        message: 'ID utilisateur invalide' 
+      });
+      return;
+    }
+
+    const client = await pool.connect();
+    let hadMatch = false;
+    try {
+      // Vérifier s'il y avait un match avant de supprimer le like
+      const matchResult = await client.query(`
+        SELECT 1 FROM matches 
+        WHERE (user1_id = $1 AND user2_id = $2) OR (user1_id = $2 AND user2_id = $1)
+      `, [Math.min(userId, targetUserId), Math.max(userId, targetUserId)]);
+
+      hadMatch = matchResult.rows.length > 0;
+
+      // Supprimer le like
+      await client.query(`
+        DELETE FROM likes 
+        WHERE liker_id = $1 AND liked_id = $2
+      `, [userId, targetUserId]);
+
+      // Si il y avait un match, le supprimer
+      if (hadMatch) {
+        await client.query(`
+          DELETE FROM matches 
+          WHERE (user1_id = $1 AND user2_id = $2) OR (user1_id = $2 AND user2_id = $1)
+        `, [Math.min(userId, targetUserId), Math.max(userId, targetUserId)]);
+
+        // Marquer les conversations comme inactives (ou les supprimer selon le besoin)
+        await client.query(`
+          UPDATE conversations 
+          SET is_active = false 
+          WHERE (user1_id = $1 AND user2_id = $2) OR (user1_id = $2 AND user2_id = $1)
+        `, [Math.min(userId, targetUserId), Math.max(userId, targetUserId)]);
+      }
+
+      // Mettre à jour le fame rating des deux utilisateurs
+      await updateFameRating(userId, client);
+      await updateFameRating(targetUserId, client);
+
+      res.json({
+        success: true,
+        message: 'Like supprimé avec succès',
+        hadMatch
+      });
+
+    } finally {
+      client.release();
+    }
+
+    // Créer une notification d'unlike si il y avait un match
+    if (hadMatch) {
+      const userProfile = await ProfileModel.findCompleteProfile(userId);
+      await createNotification(
+        targetUserId,
+        NotificationType.UNLIKE,
+        `💔 ${userProfile?.first_name} a retiré son like`,
+        { userId: userId, profileName: userProfile?.first_name }
+      );
+    }
+
+  } catch (error) {
+    console.error('Erreur suppression like:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erreur serveur' 
+    });
+  }
+});
+
+// GET /api/profile/history/likes - Obtenir l'historique des likes reçus
+router.get('/history/likes', authenticateToken, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = (req as any).user.userId;
+    const limit = parseInt(req.query.limit as string) || 20;
+    
+    const result = await pool.query(`
+      SELECT 
+        l.id, l.liker_id, l.created_at,
+        u.username, u.first_name, u.last_name,
+        p.age, p.city
+      FROM likes l
+      JOIN users u ON l.liker_id = u.id
+      LEFT JOIN profiles p ON u.id = p.user_id
+      WHERE l.liked_id = $1 AND l.is_like = true
+      ORDER BY l.created_at DESC
+      LIMIT $2
+    `, [userId, limit]);
+    
+    res.json({
+      success: true,
+      likes: result.rows
+    });
+  } catch (error) {
+    console.error('Erreur récupération historique likes:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erreur serveur' 
+    });
+  }
+});
+
+// GET /api/profile/history/visits - Obtenir l'historique des visites reçues
+router.get('/history/visits', authenticateToken, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = (req as any).user.userId;
+    const limit = parseInt(req.query.limit as string) || 20;
+    
+    const result = await pool.query(`
+      SELECT 
+        v.id, v.visitor_id, v.visited_at,
+        u.username, u.first_name, u.last_name,
+        p.age, p.city
+      FROM profile_visits v
+      JOIN users u ON v.visitor_id = u.id
+      LEFT JOIN profiles p ON u.id = p.user_id
+      WHERE v.visited_id = $1
+      ORDER BY v.visited_at DESC
+      LIMIT $2
+    `, [userId, limit]);
+    
+    res.json({
+      success: true,
+      visits: result.rows
+    });
+  } catch (error) {
+    console.error('Erreur récupération historique visites:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erreur serveur' 
+    });
+  }
+});
+
+// Fonction pour calculer et mettre à jour le fame rating
+async function updateFameRating(userId: number, client: any): Promise<void> {
+  try {
+    const result = await client.query(`
+      SELECT 
+        (SELECT COUNT(*) FROM likes WHERE liked_id = $1 AND is_like = true) as likes_count,
+        (SELECT COUNT(*) FROM profile_visits WHERE visited_id = $1) as visits_count,
+        (SELECT COUNT(*) FROM matches WHERE user1_id = $1 OR user2_id = $1) as matches_count,
+        (SELECT COUNT(*) FROM likes WHERE liked_id = $1 AND is_like = false) as dislikes_count
+    `, [userId]);
+
+    const stats = result.rows[0];
+    
+    // Calculer le fame rating basé sur:
+    // - Likes reçus: +2 points chacun
+    // - Visites: +1 point chaque
+    // - Matches: +5 points chacun
+    // - Dislikes: -1 point chacun
+    const fameRating = Math.max(0, 
+      (stats.likes_count * 2) + 
+      (stats.visits_count * 1) + 
+      (stats.matches_count * 5) - 
+      (stats.dislikes_count * 1)
+    );
+
+    await client.query(`
+      UPDATE profiles 
+      SET fame_rating = $1 
+      WHERE user_id = $2
+    `, [fameRating, userId]);
+
+  } catch (error) {
+    console.error('Erreur mise à jour fame rating:', error);
+  }
 }
 
 export default router; 
