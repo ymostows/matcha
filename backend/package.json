@@ -12,6 +12,11 @@
     "clean:db": "ts-node src/scripts/cleanDatabase.ts",
     "clean:complete": "ts-node src/scripts/cleanDatabaseCompletely.ts",
     "fix:sequences": "ts-node src/scripts/fixSequences.ts",
+    "generate:profiles": "node src/scripts/generateProfiles.js",
+    "generate:realistic": "node src/scripts/generateWithRealPhotos.js",
+    "generate:ai": "ts-node src/scripts/generateAIProfiles.ts",
+    "generate:photos": "ts-node src/scripts/generateProfilesWithPhotos.ts",
+    "ts-node": "ts-node",
     "test": "jest",
     "test:watch": "jest --watch"
   },
@@ -37,7 +42,7 @@
     "helmet": "^7.0.0",
     "jsonwebtoken": "^9.0.2",
     "multer": "^1.4.5-lts.1",
-    "node-fetch": "^3.3.2",
+    "node-fetch": "^2.6.7",
     "nodemailer": "^6.10.1",
     "pg": "^8.11.3",
     "uuid": "^9.0.0",
@@ -54,6 +59,7 @@
     "@types/pg": "^8.10.2",
     "@types/uuid": "^9.0.2",
     "@types/validator": "^13.15.2",
+    "ts-node": "^10.9.1",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.1.6"
   }

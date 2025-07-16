@@ -2,6 +2,9 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+settings:
+  dangerouslySkipPermissions: true
+
 ## Project Overview
 
 Web Matcha is a modern dating application built with React, Express.js, and PostgreSQL. The architecture is a full-stack monorepo with separate frontend and backend services containerized with Docker.

@@ -209,14 +209,24 @@ router.get('/browse', authenticateToken, async (req: Request, res: Response): Pr
     const userOrientation = currentUserProfile.sexual_orientation || 'bi';
     const userGender = currentUserProfile.gender;
 
-    // Déterminer les genres à afficher selon l'orientation
+    // Déterminer les genres à afficher selon l'orientation ET la compatibilité mutuelle
     let targetGenders: string[] = [];
+    let compatibleOrientations: string[] = [];
+    
     if (userOrientation === 'hetero') {
-      targetGenders = userGender === 'homme' ? ['femme'] : ['homme'];
+      if (userGender === 'homme') {
+        targetGenders = ['femme'];
+        compatibleOrientations = ['hetero', 'bi']; // Femmes hétéro ou bi
+      } else {
+        targetGenders = ['homme'];
+        compatibleOrientations = ['hetero', 'bi']; // Hommes hétéro ou bi
+      }
     } else if (userOrientation === 'homo') {
       targetGenders = [userGender || 'homme'];
+      compatibleOrientations = ['homo', 'bi']; // Même genre, homo ou bi
     } else { // bi ou undefined
       targetGenders = ['homme', 'femme'];
+      compatibleOrientations = ['hetero', 'homo', 'bi']; // Tous compatibles
     }
 
     // Construire la requête de base
@@ -226,6 +236,7 @@ router.get('/browse', authenticateToken, async (req: Request, res: Response): Pr
         p.biography, p.age, p.gender, p.sexual_orientation, 
         COALESCE(p.interests, '{}') as interests,
         p.location_lat, p.location_lng, p.city, p.fame_rating,
+        (SELECT COUNT(*) FROM likes WHERE liked_id = u.id AND is_like = true) as likes_count,
         (
           CASE 
             WHEN p.interests IS NOT NULL AND array_length(p.interests, 1) > 0 AND $1::text[] IS NOT NULL AND array_length($1::text[], 1) > 0
@@ -270,13 +281,18 @@ router.get('/browse', authenticateToken, async (req: Request, res: Response): Pr
         AND p.age IS NOT NULL
         AND p.gender IS NOT NULL
         AND p.gender = ANY($5)
+        AND p.sexual_orientation = ANY($6)
         AND NOT EXISTS (
           SELECT 1 FROM likes l 
           WHERE l.liker_id = $4 AND l.liked_id = u.id
         )
+        AND NOT EXISTS (
+          SELECT 1 FROM blocks b 
+          WHERE (b.blocker_id = $4 AND b.blocked_id = u.id) OR (b.blocker_id = u.id AND b.blocked_id = $4)
+        )
     `;
 
-    let paramIndex = 6;
+    let paramIndex = 7;
     const userInterests = currentUserProfile.interests && currentUserProfile.interests.length > 0 
       ? currentUserProfile.interests 
       : null;
@@ -286,7 +302,8 @@ router.get('/browse', authenticateToken, async (req: Request, res: Response): Pr
       currentUserProfile.location_lat || null,
       currentUserProfile.location_lng || null,
       userId,
-      targetGenders
+      targetGenders,
+      compatibleOrientations
     ];
 
     // Ajouter les filtres
@@ -315,9 +332,19 @@ router.get('/browse', authenticateToken, async (req: Request, res: Response): Pr
     }
 
     if (Array.isArray(commonTags) && commonTags.length > 0) {
-      query += ` AND p.interests IS NOT NULL AND p.interests && $${paramIndex}::text[]`;
-      params.push(commonTags);
-      paramIndex++;
+      // Recherche flexible qui ignore les émojis et fait une correspondance partielle
+      query += ` AND p.interests IS NOT NULL AND (`;
+      const tagConditions = commonTags.map((tag, index) => {
+        const currentParamIndex = paramIndex + index;
+        return `EXISTS (
+          SELECT 1 FROM unnest(p.interests) AS interest 
+          WHERE LOWER(regexp_replace(interest, '[^\w\s]', '', 'g')) LIKE LOWER('%' || $${currentParamIndex} || '%')
+        )`;
+      });
+      query += tagConditions.join(' OR ');
+      query += ')';
+      params.push(...commonTags);
+      paramIndex += commonTags.length;
     }
 
     // Ajouter le filtre de distance
@@ -344,6 +371,10 @@ router.get('/browse', authenticateToken, async (req: Request, res: Response): Pr
         break;
       case 'common_tags':
         orderClause = `ORDER BY common_tags_count ${sortOrder}, distance_km ASC`;
+        break;
+      case 'intelligent':
+        // Matching intelligent basé sur les 3 critères combinés
+        orderClause = `ORDER BY common_tags_count DESC, p.fame_rating DESC, distance_km ASC`;
         break;
       case 'distance':
       default:
@@ -389,6 +420,20 @@ router.get('/:userId', authenticateToken, async (req: Request, res: Response): P
       res.status(400).json({ 
         success: false, 
         message: 'Utilisez la route /profile pour votre propre profil' 
+      });
+      return;
+    }
+
+    // Vérifier si l'utilisateur est bloqué
+    const blockCheck = await pool.query(`
+      SELECT 1 FROM blocks 
+      WHERE (blocker_id = $1 AND blocked_id = $2) OR (blocker_id = $2 AND blocked_id = $1)
+    `, [visitorId, targetUserId]);
+
+    if (blockCheck.rows.length > 0) {
+      res.status(403).json({ 
+        success: false, 
+        message: 'Profil non accessible' 
       });
       return;
     }
@@ -757,6 +802,109 @@ router.get('/history/visits', authenticateToken, async (req: Request, res: Respo
     });
   } catch (error) {
     console.error('Erreur récupération historique visites:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erreur serveur' 
+    });
+  }
+});
+
+// POST /api/profile/block - Bloquer un utilisateur
+router.post('/block', authenticateToken, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = (req as any).user.userId;
+    const { targetUserId } = req.body;
+
+    if (!targetUserId) {
+      res.status(400).json({ 
+        success: false, 
+        message: 'ID utilisateur cible manquant' 
+      });
+      return;
+    }
+
+    if (userId === targetUserId) {
+      res.status(400).json({ 
+        success: false, 
+        message: 'Vous ne pouvez pas vous bloquer vous-même' 
+      });
+      return;
+    }
+
+    const client = await pool.connect();
+    try {
+      // Ajouter le blocage
+      await client.query(`
+        INSERT INTO blocks (blocker_id, blocked_id)
+        VALUES ($1, $2)
+        ON CONFLICT (blocker_id, blocked_id) DO NOTHING
+      `, [userId, targetUserId]);
+
+      // Supprimer les likes mutuels
+      await client.query(`
+        DELETE FROM likes 
+        WHERE (liker_id = $1 AND liked_id = $2) OR (liker_id = $2 AND liked_id = $1)
+      `, [userId, targetUserId]);
+
+      // Supprimer les matches
+      await client.query(`
+        DELETE FROM matches 
+        WHERE (user1_id = $1 AND user2_id = $2) OR (user1_id = $2 AND user2_id = $1)
+      `, [Math.min(userId, targetUserId), Math.max(userId, targetUserId)]);
+
+      // Mettre à jour le fame rating des deux utilisateurs
+      await updateFameRating(userId, client);
+      await updateFameRating(targetUserId, client);
+
+      res.json({
+        success: true,
+        message: 'Utilisateur bloqué avec succès'
+      });
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Erreur blocage utilisateur:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erreur serveur' 
+    });
+  }
+});
+
+// POST /api/profile/report - Signaler un utilisateur
+router.post('/report', authenticateToken, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = (req as any).user.userId;
+    const { targetUserId, reason } = req.body;
+
+    if (!targetUserId || !reason) {
+      res.status(400).json({ 
+        success: false, 
+        message: 'ID utilisateur cible et raison requis' 
+      });
+      return;
+    }
+
+    if (userId === targetUserId) {
+      res.status(400).json({ 
+        success: false, 
+        message: 'Vous ne pouvez pas vous signaler vous-même' 
+      });
+      return;
+    }
+
+    await pool.query(`
+      INSERT INTO reports (reporter_id, reported_id, reason)
+      VALUES ($1, $2, $3)
+    `, [userId, targetUserId, reason]);
+
+    res.json({
+      success: true,
+      message: 'Signalement enregistré avec succès'
+    });
+  } catch (error) {
+    console.error('Erreur signalement utilisateur:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Erreur serveur' 

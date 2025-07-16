@@ -13,14 +13,22 @@ import {
   Eye,
   Clock,
   CheckCircle,
-  Camera
+  Camera,
+  Shield,
+  Flag,
+  Loader2,
+  X
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { PhotoViewer } from '../components/ui/PhotoViewer';
+import { ConfirmDialog, MatchDialog } from '../components/ui/dialog';
+import { PromptDialog } from '../components/ui/prompt-dialog';
 import { profileApi, CompleteProfile } from '../services/profileApi';
 import { API_BASE_URL } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../hooks/useToast';
+import { useDialog } from '../hooks/useDialog';
 
 export const ProfilePublicPage: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
@@ -29,12 +37,34 @@ export const ProfilePublicPage: React.FC = () => {
   const { user: currentUser } = useAuth();
   const [profile, setProfile] = useState<CompleteProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [errorState, setErrorState] = useState<string | null>(null);
   const [isPhotoViewerOpen, setIsPhotoViewerOpen] = useState(false);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
+  const [likeStatus, setLikeStatus] = useState<{
+    isLiked: boolean;
+    isMatched: boolean;
+    hasLikedMe: boolean;
+  }>({ isLiked: false, isMatched: false, hasLikedMe: false });
+  const [isActionLoading, setIsActionLoading] = useState(false);
+  
+  // Hooks pour les notifications et dialogs
+  const { success, error: errorToast, warning } = useToast();
+  const { 
+    dialogState, 
+    promptState, 
+    matchState, 
+    showConfirm, 
+    showPrompt, 
+    showMatch, 
+    closeDialog, 
+    closePrompt, 
+    closeMatch,
+    setDialogLoading,
+    setPromptLoading
+  } = useDialog();
 
   // Déterminer si c'est notre propre profil
-  const isOwnProfile = !userId || (currentUser && userId === currentUser.id?.toString());
+  const isOwnProfile = !userId || (currentUser && userId === String(currentUser.id));
   
   // Déterminer si on vient de créer le profil
   const isProfileCreated = location.pathname === '/profile-success';
@@ -52,7 +82,10 @@ export const ProfilePublicPage: React.FC = () => {
 
   useEffect(() => {
     loadProfile();
-  }, [userId]);
+    if (!isOwnProfile && userId) {
+      loadLikeStatus();
+    }
+  }, [userId, isOwnProfile]);
 
   const loadProfile = async () => {
     try {
@@ -64,14 +97,45 @@ export const ProfilePublicPage: React.FC = () => {
         profileData = await profileApi.getMyProfile();
       } else {
         // Profil d'un autre utilisateur
-        profileData = await profileApi.getProfile(parseInt(userId!));
+        const userIdNumber = parseInt(userId!);
+        if (isNaN(userIdNumber)) {
+          throw new Error('ID utilisateur invalide');
+        }
+        profileData = await profileApi.getProfile(userIdNumber);
       }
       
       setProfile(profileData);
-    } catch (error) {
-      setError('Profil non trouvé');
+    } catch (err) {
+      console.error('Erreur lors du chargement du profil:', err);
+      setErrorState('Profil non trouvé');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadLikeStatus = async () => {
+    try {
+      const userIdNumber = parseInt(userId!);
+      if (isNaN(userIdNumber)) return;
+
+      // Vérifier si j'ai liké cet utilisateur
+      const likedProfiles = await profileApi.getLikedProfiles(100);
+      const isLiked = likedProfiles.some(p => p.user_id === userIdNumber);
+
+      // Vérifier si cet utilisateur m'a liké
+      const likesHistory = await profileApi.getLikesHistory(100);
+      const hasLikedMe = likesHistory.some(like => like.liker_id === userIdNumber);
+
+      // Vérifier si nous sommes matchés (simple check basé sur like mutuel)
+      const isMatched = isLiked && hasLikedMe;
+
+      setLikeStatus({
+        isLiked,
+        isMatched,
+        hasLikedMe
+      });
+    } catch (err) {
+      console.error('Erreur lors du chargement du statut de like:', err);
     }
   };
 
@@ -86,6 +150,27 @@ export const ProfilePublicPage: React.FC = () => {
     return age;
   };
 
+  const isUserOnline = (lastSeen: string) => {
+    const lastSeenDate = new Date(lastSeen);
+    const now = new Date();
+    const diffMinutes = (now.getTime() - lastSeenDate.getTime()) / (1000 * 60);
+    return diffMinutes < 5; // Considéré en ligne si vu dans les 5 dernières minutes
+  };
+
+  const formatLastSeen = (lastSeen: string) => {
+    const lastSeenDate = new Date(lastSeen);
+    const now = new Date();
+    const diffMinutes = (now.getTime() - lastSeenDate.getTime()) / (1000 * 60);
+    
+    if (diffMinutes < 60) {
+      return `il y a ${Math.floor(diffMinutes)} min`;
+    } else if (diffMinutes < 24 * 60) {
+      return `il y a ${Math.floor(diffMinutes / 60)} h`;
+    } else {
+      return `le ${lastSeenDate.toLocaleDateString('fr-FR')} à ${lastSeenDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`;
+    }
+  };
+
   const getPhotoUrl = (photoId: number): string => {
     const baseUrl = API_BASE_URL.replace('/api', '');
     return `${baseUrl}/api/photos/${photoId}/image`;
@@ -95,6 +180,116 @@ export const ProfilePublicPage: React.FC = () => {
   const openPhotoViewer = (index: number) => {
     setSelectedPhotoIndex(index);
     setIsPhotoViewerOpen(true);
+  };
+
+  // Gérer le like/unlike
+  const handleLike = async () => {
+    if (!userId) return;
+    
+    try {
+      setIsActionLoading(true);
+      const userIdNumber = parseInt(userId);
+      
+      if (likeStatus.isLiked) {
+        // Unlike
+        const result = await profileApi.unlikeProfile(userIdNumber);
+        if (result.hadMatch) {
+          warning('💔 Le match a été supprimé et le chat désactivé.');
+        }
+        setLikeStatus(prev => ({ ...prev, isLiked: false, isMatched: false }));
+      } else {
+        // Like
+        const result = await profileApi.likeProfile(userIdNumber, true);
+        if (result.isMatch) {
+          showMatch({
+            userName: profile?.first_name || 'cet utilisateur',
+            onContinue: () => {
+              closeMatch();
+              setLikeStatus(prev => ({ ...prev, isLiked: true, isMatched: true }));
+            }
+          });
+        } else {
+          setLikeStatus(prev => ({ ...prev, isLiked: true }));
+          success('Profil liké avec succès !');
+        }
+      }
+    } catch (err: any) {
+      console.error('Erreur lors du like:', err);
+      const errorMessage = err.response?.data?.message || 'Erreur lors de l\'action';
+      
+      if (errorMessage.includes('photo')) {
+        showConfirm({
+          title: 'Photos requises',
+          message: `${errorMessage}\n\nVoulez-vous ajouter des photos maintenant ?`,
+          type: 'warning',
+          confirmText: 'Ajouter des photos',
+          onConfirm: () => {
+            navigate('/profile-edit');
+            closeDialog();
+          }
+        });
+      } else {
+        errorToast(errorMessage);
+      }
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  // Gérer le blocage
+  const handleBlock = async () => {
+    if (!userId) return;
+    
+    showConfirm({
+      title: 'Bloquer cet utilisateur',
+      message: 'Êtes-vous sûr de vouloir bloquer cet utilisateur ? Cette action supprimera toutes vos interactions et est irréversible.',
+      type: 'danger',
+      confirmText: 'Bloquer',
+      onConfirm: async () => {
+        try {
+          setDialogLoading(true);
+          const userIdNumber = parseInt(userId);
+          await profileApi.blockUser(userIdNumber);
+          success('Utilisateur bloqué avec succès');
+          closeDialog();
+          navigate('/browsing'); // Rediriger vers la page de navigation
+        } catch (err: any) {
+          console.error('Erreur lors du blocage:', err);
+          const errorMessage = err.response?.data?.message || 'Erreur lors du blocage';
+          errorToast(errorMessage);
+        } finally {
+          setDialogLoading(false);
+        }
+      }
+    });
+  };
+
+  // Gérer le signalement
+  const handleReport = async () => {
+    if (!userId) return;
+    
+    showPrompt({
+      title: 'Signaler ce profil',
+      message: 'Pourquoi signalez-vous ce profil comme faux compte ?',
+      placeholder: 'Raison du signalement...',
+      confirmText: 'Signaler',
+      required: true,
+      onSubmit: async (reason) => {
+        try {
+          setPromptLoading(true);
+          const userIdNumber = parseInt(userId);
+          await profileApi.reportUser(userIdNumber, reason);
+          success('Signalement enregistré avec succès. Merci de nous aider à maintenir la qualité de la communauté.');
+          closePrompt();
+        } catch (err: any) {
+          console.error('Erreur lors du signalement:', err);
+          const errorMessage = err.response?.data?.message || 'Erreur lors du signalement';
+          errorToast(errorMessage);
+        } finally {
+          setPromptLoading(false);
+        }
+      }
+    });
   };
 
   if (isLoading) {
@@ -108,14 +303,14 @@ export const ProfilePublicPage: React.FC = () => {
     );
   }
 
-  if (error || !profile) {
+  if (errorState || !profile) {
     return (
       <div className="flex items-center justify-center py-20 px-4">
         <Card className="w-full max-w-md glow-gentle">
           <CardContent className="text-center p-8">
             <User className="w-16 h-16 text-gray-300 mx-auto mb-4" />
             <h2 className="text-xl font-semibold text-twilight mb-2">Profil non trouvé</h2>
-            <p className="text-twilight/60 mb-6">{error || 'Ce profil n\'existe pas ou n\'est plus disponible.'}</p>
+            <p className="text-twilight/60 mb-6">{errorState || 'Ce profil n\'existe pas ou n\'est plus disponible.'}</p>
             <Button 
               onClick={() => navigate('/dashboard')}
               className="bg-gradient-to-r from-primary to-accent text-white hover:shadow-lg transition-all duration-200"
@@ -129,7 +324,7 @@ export const ProfilePublicPage: React.FC = () => {
   }
 
   return (
-    <div className="py-8 px-4">
+    <div className="py-8 px-4 min-h-screen">
       <div className="max-w-4xl mx-auto">
         {/* Bannière de succès si profil créé */}
         {isProfileCreated && (
@@ -186,16 +381,16 @@ export const ProfilePublicPage: React.FC = () => {
         </motion.div>
 
         {/* Layout principal - style cohérent avec ProfileEditPage */}
-        <div className="max-w-4xl mx-auto space-y-6">
+        <div className="max-w-4xl mx-auto space-y-6 flex flex-col">
           {/* Section Header avec info principale */}
-          <Card className="mb-6 glow-gentle">
-            <CardContent className="p-6 sm:p-8">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8 items-start">
+          <Card className="mb-6 glow-gentle flex-1">
+            <CardContent className="p-4 sm:p-6 md:p-8">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 md:gap-8 items-start">
                 {/* Photo de profil */}
-                <div className="md:col-span-1">
+                <div className="md:col-span-1 flex justify-center md:justify-start">
                   {profile.photos && profile.photos.length > 0 ? (
                     <motion.div 
-                      className="relative aspect-square bg-gray-100 rounded-2xl overflow-hidden group cursor-pointer shadow-lg hover:shadow-xl transition-all duration-300"
+                      className="relative aspect-square bg-gray-100 rounded-2xl overflow-hidden group cursor-pointer shadow-lg hover:shadow-xl transition-all duration-300 w-full max-w-xs md:max-w-none"
                       whileHover={{ scale: 1.02 }}
                       onClick={() => openPhotoViewer(profile.photos?.findIndex(p => p.is_profile_picture) || 0)}
                     >
@@ -221,13 +416,37 @@ export const ProfilePublicPage: React.FC = () => {
                 </div>
 
                 {/* Informations principales */}
-                <div className="md:col-span-2 space-y-6">
+                <div className="md:col-span-2 space-y-4 sm:space-y-6">
                   {/* Nom et âge */}
-                  <div>
-                    <h1 className="text-3xl sm:text-4xl font-bold text-twilight mb-2">
-                      {profile.first_name} {profile.last_name}
-                    </h1>
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 text-twilight/70">
+                  <div className="text-center md:text-left">
+                    <div className="flex flex-col sm:flex-row items-center sm:items-start gap-3 mb-2">
+                      <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-twilight">
+                        {profile.first_name} {profile.last_name}
+                      </h1>
+                      {!isOwnProfile && (
+                        <div className="flex flex-wrap justify-center sm:justify-start items-center gap-2">
+                          {likeStatus.isMatched && (
+                            <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium flex items-center gap-1">
+                              <Heart className="w-3 h-3 fill-current" />
+                              Connecté
+                            </span>
+                          )}
+                          {!likeStatus.isMatched && likeStatus.hasLikedMe && (
+                            <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium flex items-center gap-1">
+                              <Heart className="w-3 h-3" />
+                              Vous aime
+                            </span>
+                          )}
+                          {!likeStatus.isMatched && likeStatus.isLiked && (
+                            <span className="bg-pink-100 text-pink-800 px-3 py-1 rounded-full text-sm font-medium flex items-center gap-1">
+                              <Heart className="w-3 h-3 fill-current" />
+                              Liké
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-col sm:flex-row items-center sm:items-start gap-2 sm:gap-4 text-twilight/70 justify-center sm:justify-start">
                       <div className="flex items-center gap-2">
                         <Calendar className="w-4 h-4" />
                         <span>{profile.age} ans</span>
@@ -236,13 +455,19 @@ export const ProfilePublicPage: React.FC = () => {
                         <MapPin className="w-4 h-4" />
                         <span>{profile.city || 'Non spécifié'}</span>
                       </div>
+                      <div className="flex items-center gap-2">
+                        <div className={`w-2 h-2 rounded-full ${isUserOnline(profile.last_seen) ? 'bg-green-500' : 'bg-gray-400'}`} />
+                        <span className="text-sm">
+                          {isUserOnline(profile.last_seen) ? 'En ligne' : `Vu ${formatLastSeen(profile.last_seen)}`}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
                   {/* Biographie */}
                   {profile.biography && (
-                    <div className="bg-gray-50 rounded-xl p-4 sm:p-6">
-                      <h3 className="font-semibold text-twilight mb-3 flex items-center gap-2">
+                    <div className="bg-gray-50 rounded-xl p-4 sm:p-6 text-center md:text-left">
+                      <h3 className="font-semibold text-twilight mb-3 flex items-center justify-center md:justify-start gap-2">
                         <Heart className="w-4 h-4 text-primary" />
                         À propos
                       </h3>
@@ -260,12 +485,12 @@ export const ProfilePublicPage: React.FC = () => {
 
                   {/* Centres d'intérêt */}
                   {profile.interests && profile.interests.length > 0 && (
-                    <div>
-                      <h3 className="font-semibold text-twilight mb-3 flex items-center gap-2">
+                    <div className="text-center md:text-left">
+                      <h3 className="font-semibold text-twilight mb-3 flex items-center justify-center md:justify-start gap-2">
                         <Heart className="w-4 h-4 text-primary" />
                         Centres d'intérêt
                       </h3>
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-wrap gap-2 justify-center md:justify-start">
                         {profile.interests.map((interest, index) => (
                           <motion.span
                             key={index}
@@ -282,7 +507,7 @@ export const ProfilePublicPage: React.FC = () => {
                   )}
 
                   {/* Statistiques */}
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-3 gap-4 max-w-sm mx-auto md:mx-0">
                     <div className="text-center bg-primary/10 rounded-xl p-4">
                       <div className="text-2xl font-bold text-primary">{profile.fame_rating || 0}</div>
                       <div className="text-sm text-twilight/60">Fame Rating</div>
@@ -339,25 +564,63 @@ export const ProfilePublicPage: React.FC = () => {
             </Card>
           )}
 
-          {/* Boutons d'actions - Non flottants pour une meilleure compatibilité */}
+          {/* Boutons d'actions - Fonctionnels */}
           {!isOwnProfile && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+            <Card className="flex-1 flex flex-col justify-center">
+              <CardHeader className="text-center">
+                <CardTitle className="flex items-center justify-center gap-2">
                   <Heart className="w-5 h-5 text-primary" />
                   Actions
                 </CardTitle>
               </CardHeader>
-              <CardContent className="flex flex-col sm:flex-row gap-3">
-                <Button className="w-full bg-peach-gradient shadow-lg">
-                  <Heart className="w-4 h-4 mr-2" /> Liker le profil
-                </Button>
-                <Button variant="outline" className="w-full">
-                  <MessageCircle className="w-4 h-4 mr-2" /> Envoyer un message
-                </Button>
-                <Button variant="ghost" className="w-full text-red-500 hover:bg-red-50 hover:text-red-600">
-                  Rejeter
-                </Button>
+              <CardContent className="space-y-6 p-4 sm:p-6 flex-1 flex flex-col justify-center">
+                {/* Bouton principal - Like/Unlike */}
+                <div className="flex flex-col gap-3 w-full max-w-sm mx-auto">
+                  <Button 
+                    className={`w-full py-4 sm:py-3 text-base sm:text-sm ${likeStatus.isLiked ? 'bg-red-500 hover:bg-red-600' : 'bg-pink-500 hover:bg-pink-600'}`}
+                    onClick={handleLike}
+                    disabled={isActionLoading}
+                  >
+                    {isActionLoading ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : likeStatus.isLiked ? (
+                      <X className="w-4 h-4 mr-2" />
+                    ) : (
+                      <Heart className="w-4 h-4 mr-2" />
+                    )}
+                    {likeStatus.isLiked ? 'Retirer le like' : 'Liker le profil'}
+                  </Button>
+                  
+                  {likeStatus.isMatched && (
+                    <Button variant="outline" className="w-full py-4 sm:py-3 text-base sm:text-sm" disabled>
+                      <MessageCircle className="w-4 h-4 mr-2" />
+                      Envoyer un message
+                    </Button>
+                  )}
+                </div>
+
+                {/* Boutons secondaires */}
+                <div className="flex flex-col gap-3 w-full max-w-sm mx-auto">
+                  <Button 
+                    variant="outline" 
+                    className="w-full text-orange-600 border-orange-200 hover:bg-orange-50 py-4 sm:py-3 text-base sm:text-sm"
+                    onClick={handleReport}
+                    disabled={isActionLoading}
+                  >
+                    <Flag className="w-4 h-4 mr-2" />
+                    Signaler
+                  </Button>
+                  
+                  <Button 
+                    variant="outline" 
+                    className="w-full text-red-600 border-red-200 hover:bg-red-50 py-4 sm:py-3 text-base sm:text-sm"
+                    onClick={handleBlock}
+                    disabled={isActionLoading}
+                  >
+                    <Shield className="w-4 h-4 mr-2" />
+                    Bloquer
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           )}
@@ -374,6 +637,40 @@ export const ProfilePublicPage: React.FC = () => {
           />
         )}
       </div>
+      
+      {/* Dialogs */}
+      <ConfirmDialog
+        isOpen={dialogState.isOpen}
+        onClose={closeDialog}
+        onConfirm={dialogState.onConfirm}
+        title={dialogState.title}
+        message={dialogState.message}
+        type={dialogState.type}
+        confirmText={dialogState.confirmText}
+        cancelText={dialogState.cancelText}
+        isLoading={dialogState.isLoading}
+      />
+      
+      <PromptDialog
+        isOpen={promptState.isOpen}
+        onClose={closePrompt}
+        onSubmit={promptState.onSubmit}
+        title={promptState.title}
+        message={promptState.message}
+        placeholder={promptState.placeholder}
+        confirmText={promptState.confirmText}
+        cancelText={promptState.cancelText}
+        isLoading={promptState.isLoading}
+        required={promptState.required}
+      />
+      
+      <MatchDialog
+        isOpen={matchState.isOpen}
+        onClose={closeMatch}
+        userName={matchState.userName}
+        onMessage={matchState.onMessage}
+        onContinue={matchState.onContinue}
+      />
     </div>
   );
 }; 

@@ -121,6 +121,12 @@ const AppContent: React.FC = () => {
         </ProtectedRoute>
       } />
       
+      <Route path="/profile/:userId" element={
+        <ProtectedRoute requireCompleteProfile={true}>
+          <ProfilePublicPage />
+        </ProtectedRoute>
+      } />
+      
       {/* Routes protégées - Dashboard */}
       <Route path="/dashboard" element={
         <ProtectedRoute requireCompleteProfile={true}>
@@ -154,7 +160,7 @@ const App: React.FC = () => {
           <AppContent />
         </Suspense>
         <ToastContainer
-          position="bottom-right"
+          position="bottom-center"
           autoClose={5000}
           hideProgressBar={false}
           newestOnTop={false}

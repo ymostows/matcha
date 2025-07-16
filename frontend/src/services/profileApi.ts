@@ -15,6 +15,7 @@ export interface CompleteProfile extends ProfileData {
   id: number;
   user_id: number;
   fame_rating: number;
+  likes_count?: number;
   created_at: string;
   updated_at: string;
   photos?: Array<{
@@ -86,7 +87,7 @@ export const profileApi = {
     return response.profile;
   },
 
-  // Obtenir un profil public par ID
+  // Obtenir un profil public par ID (enregistre automatiquement la visite)
   async getProfile(userId: number): Promise<CompleteProfile> {
     const response = await api.get<ApiResponse<CompleteProfile>>(`/profile/${userId}`);
     if (!response.profile) throw new Error('Profil non trouvé');
@@ -117,7 +118,35 @@ export const profileApi = {
     return response.visits || [];
   },
 
-  // Rechercher des profils
+  // Rechercher des profils avec filtres et tri
+  async browseProfiles(filters: {
+    sortBy?: 'distance' | 'age' | 'fame_rating' | 'common_tags' | 'intelligent';
+    sortOrder?: 'asc' | 'desc';
+    ageMin?: number;
+    ageMax?: number;
+    maxDistance?: number;
+    minFameRating?: number;
+    maxFameRating?: number;
+    commonTags?: string[];
+  }): Promise<CompleteProfile[]> {
+    const params = new URLSearchParams();
+    
+    if (filters.sortBy) params.append('sortBy', filters.sortBy);
+    if (filters.sortOrder) params.append('sortOrder', filters.sortOrder);
+    if (filters.ageMin !== undefined) params.append('ageMin', filters.ageMin.toString());
+    if (filters.ageMax !== undefined) params.append('ageMax', filters.ageMax.toString());
+    if (filters.maxDistance !== undefined) params.append('maxDistance', filters.maxDistance.toString());
+    if (filters.minFameRating !== undefined) params.append('minFameRating', filters.minFameRating.toString());
+    if (filters.maxFameRating !== undefined) params.append('maxFameRating', filters.maxFameRating.toString());
+    if (filters.commonTags?.length) {
+      filters.commonTags.forEach(tag => params.append('commonTags', tag));
+    }
+
+    const response = await api.get<ApiResponse<CompleteProfile[]>>(`/profile/browse?${params.toString()}`);
+    return response.profiles || [];
+  },
+
+  // Rechercher des profils (deprecated - use browseProfiles instead)
   async searchProfiles(filters: {
     ageMin?: number;
     ageMax?: number;
@@ -128,19 +157,11 @@ export const profileApi = {
     limit?: number;
     offset?: number;
   }): Promise<CompleteProfile[]> {
-    const params = new URLSearchParams();
-    
-    if (filters.ageMin !== undefined) params.append('ageMin', filters.ageMin.toString());
-    if (filters.ageMax !== undefined) params.append('ageMax', filters.ageMax.toString());
-    if (filters.city) params.append('city', filters.city);
-    if (filters.interests?.length) params.append('interests', filters.interests.join(','));
-    if (filters.gender) params.append('gender', filters.gender);
-    if (filters.sexual_orientation) params.append('sexual_orientation', filters.sexual_orientation);
-    if (filters.limit) params.append('limit', filters.limit.toString());
-    if (filters.offset) params.append('offset', filters.offset.toString());
-
-    const response = await api.get<ApiResponse<CompleteProfile[]>>(`/profile/search?${params.toString()}`);
-    return response.profiles || [];
+    return this.browseProfiles({
+      ageMin: filters.ageMin,
+      ageMax: filters.ageMax,
+      commonTags: filters.interests
+    });
   },
 
   // Mettre à jour les informations utilisateur (nom, prénom, email)
@@ -199,21 +220,45 @@ export const profileApi = {
     }
   },
 
-  // Liker un profil
-  async likeProfile(userId: number): Promise<any> {
-    const response = await api.post(`/profile/like/${userId}`);
+  // Liker ou disliker un profil
+  async likeProfile(userId: number, isLike: boolean = true): Promise<{ success: boolean; message: string; isMatch: boolean }> {
+    const response = await api.post('/profile/like', { 
+      targetUserId: userId, 
+      isLike 
+    });
     return response;
   },
 
   // Rejeter un profil
   async rejectProfile(userId: number): Promise<any> {
-    const response = await api.post(`/profile/reject/${userId}`);
-    return response;
+    return this.likeProfile(userId, false);
+  },
+
+  // Obtenir les profils likés
+  async getLikedProfiles(limit: number = 20, offset: number = 0): Promise<CompleteProfile[]> {
+    const params = new URLSearchParams();
+    params.append('limit', limit.toString());
+    params.append('offset', offset.toString());
+    
+    const response = await api.get<ApiResponse<CompleteProfile[]>>(`/profile/liked?${params.toString()}`);
+    return response.profiles || [];
   },
 
   // Annuler un like
-  async unlikeProfile(userId: number): Promise<any> {
+  async unlikeProfile(userId: number): Promise<{ success: boolean; message: string; hadMatch: boolean }> {
     const response = await api.delete(`/profile/like/${userId}`);
+    return response;
+  },
+
+  // Bloquer un utilisateur
+  async blockUser(userId: number): Promise<{ success: boolean; message: string }> {
+    const response = await api.post('/profile/block', { targetUserId: userId });
+    return response;
+  },
+
+  // Signaler un utilisateur
+  async reportUser(userId: number, reason: string): Promise<{ success: boolean; message: string }> {
+    const response = await api.post('/profile/report', { targetUserId: userId, reason });
     return response;
   },
 }; 

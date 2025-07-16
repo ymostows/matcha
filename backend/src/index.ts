@@ -12,6 +12,8 @@ import pool from './config/database';
 import authRoutes from './routes/auth';
 import profileRoutes from './routes/profile';
 import photosRoutes from './routes/photos';
+import notificationsRoutes from './routes/notifications';
+import chatRoutes from './routes/chat';
 import { sanitizeInput } from './middleware/sanitization';
 import { initializeEmailTransporter } from './config/email';
 import errorHandler from './middleware/errorHandler';
@@ -88,6 +90,12 @@ app.use('/api/profile', profileRoutes);
 
 // Routes de photos
 app.use('/api/photos', photosRoutes);
+
+// Routes de notifications
+app.use('/api/notifications', notificationsRoutes);
+
+// Routes de chat
+app.use('/api/chat', chatRoutes);
 
 // Middleware de gestion des erreurs (doit être le dernier)
 app.use(errorHandler);

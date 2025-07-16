@@ -90,7 +90,9 @@ export class ProfileModel {
       const profileQuery = `
         SELECT 
           u.id, u.username, u.first_name, u.last_name, u.email, u.last_seen,
-          p.*
+          p.id as profile_id, p.user_id, p.biography, p.age, p.gender, p.sexual_orientation, 
+          p.interests, p.location_lat, p.location_lng, p.city, p.fame_rating,
+          p.created_at, p.updated_at
         FROM users u
         LEFT JOIN profiles p ON u.id = p.user_id
         WHERE u.id = $1

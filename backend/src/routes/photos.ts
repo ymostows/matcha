@@ -151,6 +151,7 @@ router.get('/:id/image', async (req: Request, res: Response): Promise<void> => {
       return;
     }
     
+    // Utiliser le mime type du contenu réel, pas celui de la DB (peut être incorrect)
     const mimeType = matches[1] || 'image/jpeg';
     const base64Data = matches[2];
     
