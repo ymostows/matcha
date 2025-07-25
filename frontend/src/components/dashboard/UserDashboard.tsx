@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { useProfileCompletion } from '../../hooks/useProfileCompletion';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
+import { LikesHistory } from '../matches/LikesHistory';
 
 export const UserDashboard: React.FC = () => {
   const { user } = useAuth();
@@ -130,7 +131,7 @@ export const UserDashboard: React.FC = () => {
         ))}
       </motion.div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
         {/* Profile Section améliorée */}
         <motion.div 
           initial={{ opacity: 0, x: -20 }}
@@ -253,6 +254,20 @@ export const UserDashboard: React.FC = () => {
               </div>
             </CardContent>
           </Card>
+        </motion.div>
+
+        {/* Likes reçus */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+          className="lg:col-span-1"
+        >
+          <LikesHistory 
+            limit={6}
+            showHeader={false}
+            compact={true}
+          />
         </motion.div>
       </div>
     </div>

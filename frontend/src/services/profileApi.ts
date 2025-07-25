@@ -40,6 +40,9 @@ export interface LikeHistoryItem {
   last_name: string;
   age?: number;
   city?: string;
+  photo_id?: number;
+  filename?: string;
+  is_profile_picture?: boolean;
 }
 
 export interface VisitHistoryItem {

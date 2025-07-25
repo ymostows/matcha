@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import { ProfileModel } from '../models/Profile';
 import { UserModel } from '../models/User';
 import pool from '../config/database';
@@ -8,9 +8,18 @@ import { createNotification, NotificationType } from './notifications';
 const router = Router();
 
 // GET /api/profile - Obtenir son propre profil
-router.get('/', authenticateToken, async (req: Request, res: Response): Promise<void> => {
+router.get('/', authenticateToken, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const userId = (req as any).user.userId;
+    const userId = req.user?.userId;
+    
+    if (!userId) {
+      res.status(400).json({
+        success: false,
+        message: 'ID utilisateur invalide'
+      });
+      return;
+    }
+    
     const profile = await ProfileModel.findCompleteProfile(userId);
     
     if (!profile) {
@@ -405,7 +414,17 @@ router.get('/browse', authenticateToken, async (req: Request, res: Response): Pr
 router.get('/:userId', authenticateToken, async (req: Request, res: Response): Promise<void> => {
   try {
     const visitorId = (req as any).user.userId;
-    const targetUserId = parseInt(req.params.userId);
+    const userIdParam = req.params.userId;
+    
+    if (!userIdParam) {
+      res.status(400).json({ 
+        success: false, 
+        message: 'ID utilisateur manquant' 
+      });
+      return;
+    }
+    
+    const targetUserId = parseInt(userIdParam);
 
     if (isNaN(targetUserId)) {
       res.status(400).json({ 
@@ -453,15 +472,28 @@ router.get('/:userId', authenticateToken, async (req: Request, res: Response): P
     const client = await pool.connect();
     let isNewVisit = false;
     try {
-      const result = await client.query(`
-        INSERT INTO profile_visits (visitor_id, visited_id, visited_at)
-        VALUES ($1, $2, CURRENT_TIMESTAMP)
-        ON CONFLICT (visitor_id, visited_id, DATE(visited_at)) 
-        DO UPDATE SET visited_at = CURRENT_TIMESTAMP
-        RETURNING (xmax = 0) AS is_new_visit
+      // Vérifier si une visite existe déjà aujourd'hui
+      const existingVisit = await client.query(`
+        SELECT id FROM profile_visits 
+        WHERE visitor_id = $1 AND visited_id = $2 AND DATE(visited_at) = CURRENT_DATE
       `, [visitorId, targetUserId]);
 
-      isNewVisit = result.rows[0]?.is_new_visit;
+      if (existingVisit.rows.length === 0) {
+        // Nouvelle visite aujourd'hui
+        await client.query(`
+          INSERT INTO profile_visits (visitor_id, visited_id, visited_at)
+          VALUES ($1, $2, CURRENT_TIMESTAMP)
+        `, [visitorId, targetUserId]);
+        isNewVisit = true;
+      } else {
+        // Mettre à jour l'heure de la visite existante
+        await client.query(`
+          UPDATE profile_visits 
+          SET visited_at = CURRENT_TIMESTAMP
+          WHERE visitor_id = $1 AND visited_id = $2 AND DATE(visited_at) = CURRENT_DATE
+        `, [visitorId, targetUserId]);
+        isNewVisit = false;
+      }
 
       // Mettre à jour le fame rating du profil visité
       await updateFameRating(targetUserId, client);
@@ -614,11 +646,24 @@ router.post('/like', authenticateToken, async (req: Request, res: Response): Pro
 });
 
 // GET /api/profile/liked - Obtenir les profils likés par l'utilisateur
-router.get('/liked', authenticateToken, async (req: Request, res: Response): Promise<void> => {
+router.get('/liked', authenticateToken, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const userId = (req as any).user.userId;
+    const userId = req.user?.userId;
     const limit = parseInt(req.query.limit as string) || 20;
     const offset = parseInt(req.query.offset as string) || 0;
+
+    // Debug userId - temporaire
+    // console.log('Route /liked - userId reçu:', userId, typeof userId);
+    
+    // Vérification basique de userId
+    if (!userId) {
+      console.error('userId manquant dans /liked');
+      res.status(400).json({
+        success: false,
+        message: 'ID utilisateur invalide'
+      });
+      return;
+    }
 
     const query = `
       SELECT
@@ -669,7 +714,17 @@ router.get('/liked', authenticateToken, async (req: Request, res: Response): Pro
 router.delete('/like/:userId', authenticateToken, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = (req as any).user.userId;
-    const targetUserId = parseInt(req.params.userId);
+    const userIdParam = req.params.userId;
+    
+    if (!userIdParam) {
+      res.status(400).json({ 
+        success: false, 
+        message: 'ID utilisateur manquant' 
+      });
+      return;
+    }
+    
+    const targetUserId = parseInt(userIdParam);
 
     if (isNaN(targetUserId)) {
       res.status(400).json({ 
@@ -755,10 +810,12 @@ router.get('/history/likes', authenticateToken, async (req: Request, res: Respon
       SELECT 
         l.id, l.liker_id, l.created_at,
         u.username, u.first_name, u.last_name,
-        p.age, p.city
+        p.age, p.city,
+        ph.id as photo_id, ph.filename, ph.is_profile_picture
       FROM likes l
       JOIN users u ON l.liker_id = u.id
       LEFT JOIN profiles p ON u.id = p.user_id
+      LEFT JOIN photos ph ON u.id = ph.user_id AND ph.is_profile_picture = true
       WHERE l.liked_id = $1 AND l.is_like = true
       ORDER BY l.created_at DESC
       LIMIT $2

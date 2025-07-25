@@ -15,6 +15,7 @@ export const authenticateToken = (req: AuthenticatedRequest, res: Response, next
 
   // 2. Si pas de token, retourner erreur 401
   if (!token) {
+    // console.log('Token manquant - authHeader:', authHeader);
     res.status(401).json({ 
       success: false,
       message: 'Token d\'accès requis. Veuillez vous connecter.' 
@@ -36,6 +37,9 @@ export const authenticateToken = (req: AuthenticatedRequest, res: Response, next
     }
 
     const decoded = jwt.verify(token, JWT_SECRET) as JWTPayload;
+    
+    // Debug temporaire - enlever plus tard
+    // console.log('JWT decoded userId:', decoded.userId, typeof decoded.userId);
     
     // 4. Attacher les données user à req.user
     req.user = decoded;
