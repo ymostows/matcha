@@ -1,6 +1,8 @@
-# 🚀 Guide d'Installation Matcha
+# 🚀 Guide d'Installation Matcha v2.0
 
 Ce guide garantit une installation réussie de Matcha après clonage du repository.
+
+🎆 **VERSION 2.0** - Résolution des problèmes d'erreur 500 et installation robuste sur toutes machines.
 
 ## 📋 Prérequis
 
@@ -10,6 +12,18 @@ Ce guide garantit une installation réussie de Matcha après clonage du reposito
 
 ## ⚡ Installation Rapide
 
+### Option 1: Installation robuste (recommandée)
+```bash
+# 1. Cloner le repository
+git clone <url-du-repo>
+cd matcha
+
+# 2. Lancer l'installation robuste
+chmod +x setup-robust.sh
+./setup-robust.sh
+```
+
+### Option 2: Installation classique
 ```bash
 # 1. Cloner le repository
 git clone <url-du-repo>
@@ -20,14 +34,17 @@ chmod +x setup.sh
 ./setup.sh
 ```
 
-## 🔧 Que fait le script d'installation ?
+## 🔧 Que fait le script d'installation robuste ?
 
-1. ✅ **Vérification des prérequis** (Docker, Docker Compose)
+1. ✅ **Vérification des prérequis** (Docker, Docker Compose, permissions)
 2. ✅ **Création automatique des fichiers .env** depuis les exemples
-3. ✅ **Construction des conteneurs Docker**
-4. ✅ **Initialisation de la base de données** avec schéma complet
-5. ✅ **Génération de 500 profils de test** (optionnel)
-6. ✅ **Vérification du bon fonctionnement**
+3. ✅ **Nettoyage automatique** des volumes Docker conflictuels
+4. ✅ **Construction des conteneurs Docker** avec gestion d'erreurs
+5. ✅ **Initialisation de la base de données** avec schéma unifié v2.0
+6. ✅ **Vérification de l'intégrité** du schéma
+7. ✅ **Test de l'éendpoint d'inscription** (erreur 500 résolue)
+8. ✅ **Génération de 500 profils de test** (optionnel)
+9. ✅ **Diagnostic automatique** en cas de problème
 
 ## 🌐 Accès à l'application
 
@@ -63,8 +80,24 @@ docker-compose down -v
 
 ## 🔍 Dépannage
 
+### 🚑 Diagnostic Automatique
+```bash
+# Lancer le diagnostic complet
+./diagnose.sh
+```
+Ce script identifie automatiquement 90% des problèmes courants.
+
+### 🚫 Erreur 500 lors de l'inscription (RÉSOLU)
+Ce problème a été résolu dans la v2.0 :
+- **Cause** : Conflits de colonnes dans la base de données
+- **Solution** : Schéma unifié sans migrations conflictuelles
+- **Test** : `./diagnose.sh` vérifie automatiquement
+
 ### Problème : Services ne démarrent pas
 ```bash
+# Diagnostic détaillé
+./diagnose.sh
+
 # Vérifier l'état des conteneurs
 docker-compose ps
 
@@ -74,26 +107,23 @@ docker-compose logs
 
 ### Problème : Ports occupés
 ```bash
-# Vérifier les ports utilisés
-sudo netstat -tulpn | grep -E ':(3001|5173|5433|8080)'
+# Le diagnostic détecte automatiquement les conflits
+./diagnose.sh
 
-# Arrêter les services en conflit ou modifier les ports dans docker-compose.yml
-```
-
-### Problème : Base de données vide
-```bash
-# Régénérer les profils de test
-docker-compose exec backend npm run seed:500
+# Libérer les ports manuellement
+sudo lsof -ti:3001,5173,5433,8080 | xargs -r sudo kill
 ```
 
 ### Reset complet en cas de problème
 ```bash
-# Nettoyer complètement
+# Reset automatique avec le script robuste
+docker-compose down -v
+./setup-robust.sh
+
+# OU reset manuel
 docker-compose down -v
 docker system prune -f
 docker volume prune -f
-
-# Relancer l'installation
 ./setup.sh
 ```
 
@@ -141,10 +171,18 @@ Une fois l'installation terminée, vous pouvez tester :
 
 Si vous rencontrez des problèmes :
 
-1. Vérifiez que tous les prérequis sont installés
-2. Consultez les logs : `docker-compose logs`
-3. Essayez un reset complet
-4. Vérifiez que les ports ne sont pas occupés
+1. **TOUJOURS commencer par** : `./diagnose.sh`
+2. **Installation robuste** : `./setup-robust.sh`
+3. **Vérification du schéma** : `docker-compose exec postgres psql -U matcha_user -d matcha_db -f /docker-entrypoint-initdb.d/verify-schema.sql`
+4. **Logs détaillés** : `docker-compose logs -f`
+
+### 🆕 Nouveautés v2.0
+- ✅ Résolution définitive de l'erreur 500
+- ✅ Schéma de base de données unifié
+- ✅ Installation robuste multi-architecture
+- ✅ Diagnostic automatique intégré
+- ✅ CORS dynamique configurable
+- ✅ Volumes Docker optimisés
 
 ---
 

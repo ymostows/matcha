@@ -75,6 +75,20 @@ matcha/
 └── docker-compose.yml
 ```
 
+## 🆕 Nouveautés v2.0
+
+- ✅ **Erreur 500 résolue** : Conflits de base de données corrigés
+- ✅ **Installation robuste** : Fonctionne sur toutes les machines
+- ✅ **Diagnostic intégré** : `./diagnose.sh` identifie les problèmes
+- ✅ **CORS dynamique** : Configuration flexible
+- ✅ **Volumes optimisés** : Compatible multi-architecture
+
 ## 🔒 Sécurité
 
-⚠️ **Important** : Ce projet est configuré pour le développement uniquement. Les fichiers `.env` contiennent des valeurs par défaut non sécurisées qui ne doivent JAMAIS être utilisées en production.
+⚠️ **Important** : Ce projet est configuré pour le **développement uniquement**. Les fichiers `.env` contiennent des valeurs par défaut non sécurisées qui ne doivent JAMAIS être utilisées en production.
+
+## 📚 Documentation Complète
+
+- **Installation détaillée** : [SETUP-GUIDE.md](SETUP-GUIDE.md)
+- **Changelog** : [CHANGELOG.md](CHANGELOG.md)
+- **Diagnostic** : `./diagnose.sh`

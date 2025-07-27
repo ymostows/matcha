@@ -39,15 +39,20 @@ app.use(helmet({
   },
   crossOriginResourcePolicy: { policy: "cross-origin" } // Permettre le cross-origin pour les ressources
 })); // Sécurité HTTP renforcée
+// Configuration CORS dynamique basée sur les variables d'environnement
+const corsOrigins = process.env.CORS_ORIGINS 
+  ? process.env.CORS_ORIGINS.split(',')
+  : [
+      'http://localhost:5173', // Port par défaut de Vite
+      'http://localhost:5174', // Port alternatif
+      'http://localhost:3000',  // Port React classique
+      process.env.FRONTEND_URL || 'http://localhost:5173'
+    ];
+
 app.use(cors({
-  origin: [
-    'http://localhost:5176', // Port actuel du frontend selon les logs
-    'http://localhost:5174', // Port alternatif du frontend
-    'http://localhost:5173', // Port par défaut de Vite
-    'http://localhost:3000'  // Port mentionné dans l'env
-  ],
+  origin: corsOrigins,
   credentials: true
-})); // CORS sécurisé avec plusieurs origins
+})); // CORS sécurisé avec origins configurables
 app.use(express.json({ limit: '50mb' })); // Parser JSON avec limite pour base64
 app.use(sanitizeInput); // Protection XSS
 
