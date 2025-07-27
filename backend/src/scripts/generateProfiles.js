@@ -5,8 +5,8 @@ const crypto = require('crypto');
 
 // Configuration base de données
 const pool = new Pool({
-  host: process.env.DB_HOST || 'postgres',
-  port: process.env.DB_PORT || 5432,
+  host: process.env.DB_HOST || 'localhost',
+  port: process.env.DB_PORT || 5433,
   database: process.env.DB_NAME || 'matcha_db',
   user: process.env.DB_USER || 'matcha_user',
   password: process.env.DB_PASSWORD || 'matcha_password',

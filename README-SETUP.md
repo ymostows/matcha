@@ -15,11 +15,13 @@ git clone <url-du-repo>
 cd matcha
 
 # Exécuter le script de setup automatique
+chmod +x setup.sh
 ./setup.sh
 ```
 
 Le script se charge de tout :
 - ✅ Vérification des prérequis
+- ✅ Création automatique des fichiers .env
 - ✅ Configuration des conteneurs Docker
 - ✅ Initialisation de la base de données
 - ✅ Génération de profils de test (optionnel)

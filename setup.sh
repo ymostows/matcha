@@ -16,20 +16,30 @@ if ! command -v docker-compose &> /dev/null; then
     exit 1
 fi
 
-# Vérifier la présence des fichiers .env
+# Créer les fichiers .env depuis les exemples si nécessaire
 echo "📋 Vérification des fichiers de configuration..."
 
 if [ ! -f "backend/.env" ]; then
-    echo "⚠️  Fichier backend/.env manquant - il devrait être présent dans le repo"
-    exit 1
+    if [ -f "backend/env.example" ]; then
+        echo "📋 Création de backend/.env depuis env.example..."
+        cp backend/env.example backend/.env
+    else
+        echo "❌ Fichier backend/env.example manquant"
+        exit 1
+    fi
 fi
 
 if [ ! -f "frontend/.env" ]; then
-    echo "⚠️  Fichier frontend/.env manquant - il devrait être présent dans le repo"
-    exit 1
+    if [ -f "frontend/env.example" ]; then
+        echo "📋 Création de frontend/.env depuis env.example..."
+        cp frontend/env.example frontend/.env
+    else
+        echo "❌ Fichier frontend/env.example manquant"
+        exit 1
+    fi
 fi
 
-echo "✅ Fichiers de configuration trouvés"
+echo "✅ Fichiers de configuration prêts"
 
 # Nettoyer les volumes Docker existants (optionnel)
 read -p "🗑️  Voulez-vous nettoyer les volumes Docker existants ? (y/N): " -n 1 -r
