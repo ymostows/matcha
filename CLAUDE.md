@@ -43,6 +43,9 @@ Matcha is a dating application where users can:
 # Full application with Docker (recommended)
 docker-compose up
 
+# With Neon database (no local postgres)
+docker-compose -f docker-compose.neon.yml up
+
 # Start development with script
 ./start-dev.sh
 
@@ -70,6 +73,7 @@ npm run start:dev
 npm run clean:db              # Clean database
 npm run clean:complete        # Complete database cleanup
 npm run fix:sequences         # Fix database sequences
+npm run setup:neon            # Setup Neon database schema
 
 # Profile generation scripts
 npm run seed:500              # Generate 500 test profiles

@@ -253,6 +253,7 @@ export class UserModel {
           p.location_lng,
           p.city,
           p.fame_rating,
+          p.iscomplete,
           p.created_at as profile_created_at,
           p.updated_at as profile_updated_at
         FROM users u
@@ -296,6 +297,7 @@ export class UserModel {
         location_lng: row.location_lng,
         city: row.city,
         fame_rating: row.fame_rating,
+        isComplete: row.iscomplete || false,
         created_at: row.profile_created_at,
         updated_at: row.profile_updated_at
       };

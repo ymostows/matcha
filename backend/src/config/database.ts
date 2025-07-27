@@ -1,12 +1,15 @@
 import { Pool } from 'pg';
 
-// Configuration de la connexion PostgreSQL
+// Configuration de la connexion PostgreSQL optimisée pour Neon
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-  max: 20, // Nombre maximum de connexions dans le pool
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
+  ssl: process.env.DATABASE_URL?.includes('neon.tech') ? { rejectUnauthorized: false } : 
+       process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  max: 10, // Réduit pour Neon (limite de connexions)
+  min: 0, // Permet de fermer toutes les connexions si inactif
+  idleTimeoutMillis: 20000, // Réduit pour économiser les connexions
+  connectionTimeoutMillis: 5000, // Augmenté pour Neon (parfois plus lent)
+  statement_timeout: 5000, // Timeout pour acquérir une connexion
 });
 
 // Fonction pour tester la connexion

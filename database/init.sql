@@ -85,6 +85,29 @@ CREATE TABLE IF NOT EXISTS profile_visits (
   visited_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Table des utilisateurs bloqués
+CREATE TABLE IF NOT EXISTS blocks (
+  id SERIAL PRIMARY KEY,
+  blocker_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  blocked_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(blocker_id, blocked_id),
+  CONSTRAINT check_no_self_block CHECK (blocker_id != blocked_id)
+);
+
+-- Table des signalements
+CREATE TABLE IF NOT EXISTS reports (
+  id SERIAL PRIMARY KEY,
+  reporter_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  reported_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  reason VARCHAR(100) NOT NULL,
+  description TEXT,
+  status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'reviewed', 'resolved')),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  reviewed_at TIMESTAMP,
+  UNIQUE(reporter_id, reported_id)
+);
+
 -- ========================================
 -- TABLES TEMPS RÉEL (avec noms corrigés)
 -- ========================================
@@ -148,6 +171,11 @@ CREATE INDEX IF NOT EXISTS idx_photos_user_id ON photos(user_id);
 CREATE INDEX IF NOT EXISTS idx_likes_liker_id ON likes(liker_id);
 CREATE INDEX IF NOT EXISTS idx_likes_liked_id ON likes(liked_id);
 CREATE INDEX IF NOT EXISTS idx_matches_users ON matches(user1_id, user2_id);
+CREATE INDEX IF NOT EXISTS idx_blocks_blocker_id ON blocks(blocker_id);
+CREATE INDEX IF NOT EXISTS idx_blocks_blocked_id ON blocks(blocked_id);
+CREATE INDEX IF NOT EXISTS idx_reports_reporter_id ON reports(reporter_id);
+CREATE INDEX IF NOT EXISTS idx_reports_reported_id ON reports(reported_id);
+CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status);
 
 -- Index pour les notifications temps réel
 CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
