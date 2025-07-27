@@ -56,6 +56,25 @@ export interface VisitHistoryItem {
   city?: string;
 }
 
+// Type pour les matches
+export interface MatchItem {
+  match_id: number;
+  user_id: number;
+  username: string;
+  first_name: string;
+  last_name: string;
+  age?: number;
+  city?: string;
+  biography?: string;
+  interests?: string[];
+  fame_rating: number;
+  photo_id?: number;
+  filename?: string;
+  is_profile_picture?: boolean;
+  matched_at: string;
+  last_seen: string;
+}
+
 // Types de réponse API
 interface ApiResponse<T> {
   success: boolean;
@@ -65,6 +84,7 @@ interface ApiResponse<T> {
   visits?: VisitHistoryItem[];
   files?: string[];
   profiles?: CompleteProfile[];
+  matches?: MatchItem[];
 }
 
 // Interface pour les données utilisateur modifiables
@@ -225,7 +245,7 @@ export const profileApi = {
 
   // Liker ou disliker un profil
   async likeProfile(userId: number, isLike: boolean = true): Promise<{ success: boolean; message: string; isMatch: boolean }> {
-    const response = await api.post('/profile/like', { 
+    const response = await api.post<{ success: boolean; message: string; isMatch: boolean }>('/profile/like', { 
       targetUserId: userId, 
       isLike 
     });
@@ -249,19 +269,37 @@ export const profileApi = {
 
   // Annuler un like
   async unlikeProfile(userId: number): Promise<{ success: boolean; message: string; hadMatch: boolean }> {
-    const response = await api.delete(`/profile/like/${userId}`);
+    const response = await api.delete<{ success: boolean; message: string; hadMatch: boolean }>(`/profile/like/${userId}`);
     return response;
   },
 
   // Bloquer un utilisateur
   async blockUser(userId: number): Promise<{ success: boolean; message: string }> {
-    const response = await api.post('/profile/block', { targetUserId: userId });
+    const response = await api.post<{ success: boolean; message: string }>('/profile/block', { targetUserId: userId });
     return response;
   },
 
   // Signaler un utilisateur
   async reportUser(userId: number, reason: string): Promise<{ success: boolean; message: string }> {
-    const response = await api.post('/profile/report', { targetUserId: userId, reason });
+    const response = await api.post<{ success: boolean; message: string }>('/profile/report', { targetUserId: userId, reason });
+    return response;
+  },
+
+  // Obtenir les matches
+  async getMatches(limit: number = 20, offset: number = 0): Promise<{ matches: MatchItem[] }> {
+    const response = await api.get<ApiResponse<MatchItem[]>>(`/profile/matches?limit=${limit}&offset=${offset}`);
+    return { matches: response.matches || [] };
+  },
+
+  // Supprimer un match (unmatch)
+  async unmatchUser(matchId: number): Promise<{ success: boolean; message: string }> {
+    const response = await api.delete<{ success: boolean; message: string }>(`/profile/matches/${matchId}`);
+    return response;
+  },
+
+  // Marquer le profil comme complet
+  async completeProfile(): Promise<{ success: boolean; message: string; profile?: CompleteProfile }> {
+    const response = await api.post<{ success: boolean; message: string; profile?: CompleteProfile }>('/profile/complete');
     return response;
   },
 }; 

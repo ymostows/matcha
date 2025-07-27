@@ -368,8 +368,8 @@ export const MatchesList: React.FC<MatchesListProps> = ({
               transition={{ delay: 0.3 }}
               className={`grid gap-6 ${
                 compact 
-                  ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' 
-                  : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+                  ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' 
+                  : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6'
               }`}
             >
               <AnimatePresence>
@@ -384,7 +384,6 @@ export const MatchesList: React.FC<MatchesListProps> = ({
                     <MatchCard 
                       match={match} 
                       onUnmatch={handleUnmatch}
-                      compact={compact}
                     />
                   </motion.div>
                 ))}

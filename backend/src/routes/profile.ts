@@ -79,6 +79,61 @@ router.put('/', authenticateToken, async (req: Request, res: Response): Promise<
   }
 });
 
+// POST /api/profile/complete - Marquer le profil comme complet
+router.post('/complete', authenticateToken, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = (req as any).user.userId;
+    
+    // Vérifier que le profil existe et a les informations requises
+    const profile = await ProfileModel.findByUserId(userId);
+    if (!profile) {
+      res.status(404).json({ 
+        success: false, 
+        message: 'Profil non trouvé' 
+      });
+      return;
+    }
+
+    // Vérifier que les champs requis sont remplis
+    if (!profile.biography || !profile.age || !profile.gender || !profile.sexual_orientation) {
+      res.status(400).json({ 
+        success: false, 
+        message: 'Veuillez remplir tous les champs requis (biographie, âge, genre, orientation sexuelle)' 
+      });
+      return;
+    }
+
+    // Vérifier qu'il y a au moins une photo
+    const photosResult = await pool.query(
+      'SELECT COUNT(*) as photo_count FROM photos WHERE user_id = $1',
+      [userId]
+    );
+    
+    if (parseInt(photosResult.rows[0].photo_count) === 0) {
+      res.status(400).json({ 
+        success: false, 
+        message: 'Vous devez avoir au moins une photo pour terminer votre profil' 
+      });
+      return;
+    }
+
+    // Marquer le profil comme complet
+    const updatedProfile = await ProfileModel.markAsComplete(userId);
+    
+    res.json({ 
+      success: true, 
+      message: 'Profil marqué comme complet avec succès', 
+      profile: updatedProfile 
+    });
+  } catch (error) {
+    console.error('Erreur completion profil:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erreur serveur' 
+    });
+  }
+});
+
 // PUT /api/profile/user - Mettre à jour les informations utilisateur
 router.put('/user', authenticateToken, async (req: Request, res: Response): Promise<void> => {
   try {
@@ -406,6 +461,158 @@ router.get('/browse', authenticateToken, async (req: Request, res: Response): Pr
     res.status(500).json({ 
       success: false, 
       message: 'Erreur serveur' 
+    });
+  }
+});
+
+// GET /api/profile/matches - Obtenir la liste des matches
+router.get('/matches', authenticateToken, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+    const limit = parseInt(req.query.limit as string) || 20;
+    const offset = parseInt(req.query.offset as string) || 0;
+
+    if (!userId) {
+      res.status(400).json({
+        success: false,
+        message: 'ID utilisateur invalide'
+      });
+      return;
+    }
+
+    const query = `
+      SELECT
+        m.id as match_id,
+        u.id as user_id, u.username, u.first_name, u.last_name, u.last_seen,
+        p.biography, p.age, p.gender, p.sexual_orientation, 
+        COALESCE(p.interests, '{}') as interests,
+        p.location_lat, p.location_lng, p.city, p.fame_rating,
+        m.created_at as matched_at,
+        (
+          SELECT json_build_object(
+            'id', ph.id,
+            'filename', ph.filename,
+            'is_profile_picture', ph.is_profile_picture
+          )
+          FROM photos ph 
+          WHERE ph.user_id = u.id AND ph.is_profile_picture = true
+          LIMIT 1
+        ) AS profile_photo
+      FROM matches m
+      JOIN users u ON (
+        CASE 
+          WHEN m.user1_id = $1 THEN u.id = m.user2_id
+          WHEN m.user2_id = $1 THEN u.id = m.user1_id
+        END
+      )
+      JOIN profiles p ON u.id = p.user_id
+      WHERE (m.user1_id = $1 OR m.user2_id = $1)
+        AND u.is_verified = true
+      ORDER BY m.created_at DESC
+      LIMIT $2 OFFSET $3
+    `;
+
+    const result = await pool.query(query, [userId, limit, offset]);
+
+    const matches = result.rows.map(row => ({
+      match_id: row.match_id,
+      user_id: row.user_id,
+      username: row.username,
+      first_name: row.first_name,
+      last_name: row.last_name,
+      age: row.age,
+      city: row.city,
+      biography: row.biography,
+      interests: Array.isArray(row.interests) ? row.interests : [],
+      fame_rating: row.fame_rating || 0,
+      photo_id: row.profile_photo?.id || null,
+      filename: row.profile_photo?.filename || null,
+      is_profile_picture: row.profile_photo?.is_profile_picture || false,
+      matched_at: row.matched_at,
+      last_seen: row.last_seen
+    }));
+
+    res.json({
+      success: true,
+      matches
+    });
+
+  } catch (error) {
+    console.error('Erreur récupération matches:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erreur serveur' 
+    });
+  }
+});
+
+// DELETE /api/profile/matches/:matchId - Supprimer un match (unmatch)
+router.delete('/matches/:matchId', authenticateToken, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+    const matchId = parseInt(req.params.matchId as string);
+
+    if (!userId || !matchId) {
+      res.status(400).json({
+        success: false,
+        message: 'Données invalides'
+      });
+      return;
+    }
+
+    const client = await pool.connect();
+    
+    try {
+      await client.query('BEGIN');
+
+      // Vérifier que le match appartient à l'utilisateur
+      const matchCheck = await client.query(`
+        SELECT user1_id, user2_id 
+        FROM matches 
+        WHERE id = $1 AND (user1_id = $2 OR user2_id = $2)
+      `, [matchId, userId]);
+
+      if (matchCheck.rows.length === 0) {
+        await client.query('ROLLBACK');
+        res.status(404).json({
+          success: false,
+          message: 'Match non trouvé'
+        });
+        return;
+      }
+
+      const match = matchCheck.rows[0];
+      const otherUserId = match.user1_id === userId ? match.user2_id : match.user1_id;
+
+      // Supprimer le match
+      await client.query('DELETE FROM matches WHERE id = $1', [matchId]);
+
+      // Supprimer les likes mutuels
+      await client.query(`
+        DELETE FROM likes 
+        WHERE (liker_id = $1 AND liked_id = $2) 
+           OR (liker_id = $2 AND liked_id = $1)
+      `, [userId, otherUserId]);
+
+      await client.query('COMMIT');
+
+      res.json({
+        success: true,
+        message: 'Match supprimé avec succès'
+      });
+
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+
+  } catch (error) {
+    console.error('Erreur suppression match:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur serveur'
     });
   }
 });
@@ -817,6 +1024,11 @@ router.get('/history/likes', authenticateToken, async (req: Request, res: Respon
       LEFT JOIN profiles p ON u.id = p.user_id
       LEFT JOIN photos ph ON u.id = ph.user_id AND ph.is_profile_picture = true
       WHERE l.liked_id = $1 AND l.is_like = true
+        AND NOT EXISTS (
+          SELECT 1 FROM matches m 
+          WHERE (m.user1_id = $1 AND m.user2_id = l.liker_id) 
+             OR (m.user1_id = l.liker_id AND m.user2_id = $1)
+        )
       ORDER BY l.created_at DESC
       LIMIT $2
     `, [userId, limit]);
@@ -1004,5 +1216,6 @@ async function updateFameRating(userId: number, client: any): Promise<void> {
     console.error('Erreur mise à jour fame rating:', error);
   }
 }
+
 
 export default router; 

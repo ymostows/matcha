@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { authenticateToken } from '../middleware/auth';
 import pool from '../config/database';
+import { getSocketService } from '../services/socketService';
 
 const router = Router();
 
@@ -24,7 +25,7 @@ export interface Notification {
   created_at: string;
 }
 
-// Fonction pour créer une notification
+// Fonction pour créer une notification avec broadcasting temps réel
 export async function createNotification(
   userId: number,
   type: NotificationType,
@@ -32,10 +33,24 @@ export async function createNotification(
   data?: any
 ): Promise<void> {
   try {
-    await pool.query(`
-      INSERT INTO notifications (user_id, type, message, data, is_read, created_at)
-      VALUES ($1, $2, $3, $4, false, CURRENT_TIMESTAMP)
-    `, [userId, type, message, JSON.stringify(data)]);
+    // Utiliser le service Socket.io pour la notification temps réel
+    try {
+      const socketService = getSocketService();
+      await socketService.sendNotification(userId, {
+        type,
+        message,
+        data
+      });
+      console.log(`🔔 Notification temps réel envoyée pour user ${userId}: ${message}`);
+    } catch (socketError) {
+      console.log('⚠️ Service Socket.io non disponible, utilisation fallback DB');
+      // Fallback: sauvegarder en base sans temps réel
+      await pool.query(`
+        INSERT INTO notifications (user_id, type, message, data, is_read, created_at)
+        VALUES ($1, $2, $3, $4, false, CURRENT_TIMESTAMP)
+      `, [userId, type, message, JSON.stringify(data)]);
+      console.log(`✅ Notification DB créée pour user ${userId}: ${message}`);
+    }
   } catch (error) {
     console.error('Erreur création notification:', error);
   }
@@ -65,7 +80,18 @@ router.get('/', authenticateToken, async (req: Request, res: Response): Promise<
 
     const notifications = result.rows.map(row => ({
       ...row,
-      data: row.data ? JSON.parse(row.data) : null
+      data: (() => {
+        if (!row.data) return null;
+        if (typeof row.data === 'string') {
+          try {
+            return JSON.parse(row.data);
+          } catch (e) {
+            console.warn('Erreur parsing JSON data:', row.data);
+            return null;
+          }
+        }
+        return row.data;
+      })()
     }));
 
     res.json({
@@ -86,7 +112,7 @@ router.get('/', authenticateToken, async (req: Request, res: Response): Promise<
 router.put('/:id/read', authenticateToken, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = (req as any).user.userId;
-    const notificationId = parseInt(req.params.id);
+    const notificationId = parseInt(req.params.id as string);
 
     if (isNaN(notificationId)) {
       res.status(400).json({ 
@@ -170,5 +196,7 @@ router.get('/unread-count', authenticateToken, async (req: Request, res: Respons
     });
   }
 });
+
+// Endpoint de test supprimé - le système de notifications est maintenant en production
 
 export default router;

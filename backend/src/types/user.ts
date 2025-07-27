@@ -50,6 +50,7 @@ export interface Profile {
   location_lng?: number | null;
   city?: string | null;
   fame_rating: number;
+  isComplete: boolean;
   created_at: Date;
   updated_at: Date;
 }
@@ -84,6 +85,7 @@ export interface UpdateProfileRequest {
   sexual_orientation?: 'hetero' | 'homo' | 'bi';
   interests?: string[];
   city?: string;
+  isComplete?: boolean;
 }
 
 // Type pour les photos

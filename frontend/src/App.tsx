@@ -1,6 +1,7 @@
 import React, { Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { SocketProvider } from './contexts/SocketContext';
 import { useProfileCompletion } from './hooks/useProfileCompletion';
 import LoginForm from './components/auth/LoginForm';
 import RegisterForm from './components/auth/RegisterForm';
@@ -14,9 +15,11 @@ import { ProfileCompletionPage } from './pages/ProfileCompletionPage';
 import { ProfileEditPage } from './pages/ProfileEditPage';
 import { ProfilePublicPage } from './pages/ProfilePublicPage';
 import BrowsingPage from './pages/BrowsingPage';
+import ChatPage from './pages/ChatPage';
 import { Header } from './components/layout/Header';
-import { ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+// import { NotificationDebug } from './components/debug/NotificationDebug';
+// import { ToastContainer } from 'react-toastify';
+// import 'react-toastify/dist/ReactToastify.css';
 
 // Composant pour vérifier la complétion du profil
 const ProfileCheckWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -145,6 +148,13 @@ const AppContent: React.FC = () => {
         </ProtectedRoute>
       } />
       
+      {/* Routes protégées - Chat */}
+      <Route path="/chat/:conversationId" element={
+        <ProtectedRoute requireCompleteProfile={true}>
+          <ChatPage />
+        </ProtectedRoute>
+      } />
+      
       {/* Redirection par défaut */}
       <Route path="/" element={<Navigate to="/login" replace />} />
     </Routes>
@@ -156,21 +166,11 @@ const App: React.FC = () => {
   return (
     <Router>
       <AuthProvider>
-        <Suspense fallback={<div className="loading-screen">Chargement...</div>}>
-          <AppContent />
-        </Suspense>
-        <ToastContainer
-          position="bottom-center"
-          autoClose={5000}
-          hideProgressBar={false}
-          newestOnTop={false}
-          closeOnClick
-          rtl={false}
-          pauseOnFocusLoss
-          draggable
-          pauseOnHover
-          theme="light"
-        />
+        <SocketProvider>
+          <Suspense fallback={<div className="loading-screen">Chargement...</div>}>
+            <AppContent />
+          </Suspense>
+        </SocketProvider>
       </AuthProvider>
     </Router>
   );

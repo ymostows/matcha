@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { profileApi, LikeHistoryItem } from '../../services/profileApi';
-import { API_BASE_URL } from '../../services/api';
+import { getPhotoUrl } from '../../utils/imageUtils';
 import { useToast } from '../../hooks/useToast';
 import { useNavigate } from 'react-router-dom';
 
@@ -84,10 +84,8 @@ export const LikesHistory: React.FC<LikesHistoryProps> = ({
     navigate(`/profile/${userId}`);
   };
 
-  const getPhotoUrl = (photoId: number): string => {
-    const baseUrl = API_BASE_URL.replace('/api', '');
-    return `${baseUrl}/api/photos/${photoId}/image`;
-  };
+  // Utilisation de l'utilitaire centralisé pour les URLs d'images
+  const getPhotoUrlLocal = getPhotoUrl;
 
   const formatTimeAgo = useCallback((dateString: string) => {
     const date = new Date(dateString);
@@ -189,7 +187,7 @@ export const LikesHistory: React.FC<LikesHistoryProps> = ({
             {!compact && (
               <Button 
                 onClick={() => navigate('/browsing')}
-                className="bg-gradient-to-r from-primary via-rose-500 to-accent text-white hover:shadow-xl hover:scale-105 transition-all duration-300 px-8 py-3 text-base font-semibold"
+                className="bg-gradient-to-r from-primary via-rose-500 to-accent text-white hover:shadow-xl hover:scale-[1.02] transition-all duration-300 px-8 py-3 text-base font-semibold"
                 size="lg"
               >
                 <Heart className="w-5 h-5 mr-2" />
@@ -228,27 +226,27 @@ export const LikesHistory: React.FC<LikesHistoryProps> = ({
             </CardTitle>
           </CardHeader>
           <CardContent className="flex-1 p-4 pt-0 overflow-hidden">
-            <div className="h-full overflow-y-auto">
+            <div className={`h-full ${compact ? 'max-h-[400px]' : 'max-h-[500px]'} overflow-y-auto overflow-x-hidden scrollbar-none`} style={{ overflowAnchor: 'none' }}>
               <div
-                className="grid gap-2 sm:gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2"
+                className="grid gap-2 sm:gap-3 grid-cols-1"
               >
                 {likes.map((like) => (
-                  <div key={like.id} className="w-full">
-                    <Card className="glow-gentle hover:glow-intense transition-all duration-300 group bg-gradient-to-br from-white via-rose-50/30 to-sunset-50/20 border-rose-200/30 hover:border-primary/40 shadow-md hover:shadow-lg transform hover:scale-[1.02] h-auto">
+                  <div key={like.id} className="w-full" style={{ contain: 'layout' }}>
+                    <Card className="glow-gentle hover:glow-intense transition-all duration-300 group bg-gradient-to-br from-white via-rose-50/30 to-sunset-50/20 border-rose-200/30 hover:border-primary/40 shadow-md hover:shadow-lg h-auto">
                       <CardContent className="p-2 sm:p-3 relative overflow-hidden">
                         <div className="absolute top-0 right-0 w-12 h-12 bg-gradient-to-br from-primary/5 to-transparent rounded-full -translate-y-6 translate-x-6"></div>
                         
                         {/* Layout horizontal compact */}
                         <div className="flex items-center gap-2 sm:gap-3 relative z-10">
                           {/* Avatar compact */}
-                          <div className="w-10 h-10 sm:w-12 sm:h-12 relative flex-shrink-0">
+                          <div className="w-12 h-12 sm:w-14 sm:h-14 relative flex-shrink-0">
                             <div className="absolute inset-0 bg-gradient-to-br from-primary/15 to-accent/15 rounded-full opacity-70"></div>
                             <div className="relative w-full h-full border-2 border-white shadow-md group-hover:border-white/90 transition-all duration-300 rounded-full overflow-hidden bg-gradient-to-br from-primary to-accent flex items-center justify-center">
                               {like.photo_id ? (
                                 <img 
-                                  src={getPhotoUrl(like.photo_id)}
+                                  src={getPhotoUrlLocal(like.photo_id)}
                                   alt={`${like.first_name} ${like.last_name}`}
-                                  className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+                                  className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                                   onError={(e) => {
                                     (e.target as HTMLImageElement).style.display = 'none';
                                     const parent = (e.target as HTMLImageElement).parentElement;
@@ -299,13 +297,13 @@ export const LikesHistory: React.FC<LikesHistoryProps> = ({
                                 size="sm"
                                 onClick={() => handleLikeBack(like.liker_id)}
                                 disabled={likeActions[like.liker_id]}
-                                className="text-[10px] sm:text-xs py-1 px-2 h-6 sm:h-7 flex-1 bg-gradient-to-r from-primary via-rose-500 to-accent text-white hover:shadow-lg hover:scale-105 transform transition-all duration-200 font-medium border-0 shadow-sm relative overflow-hidden"
+                                className="text-xs py-1.5 px-2 sm:px-3 h-7 sm:h-8 flex-1 bg-gradient-to-r from-primary via-rose-500 to-accent text-white hover:shadow-lg hover:scale-[1.02] transform transition-all duration-200 font-medium border-0 shadow-sm relative overflow-hidden"
                               >
                                 {likeActions[like.liker_id] ? (
-                                  <Loader2 className="w-2.5 h-2.5 sm:w-3 sm:h-3 animate-spin" />
+                                  <Loader2 className="w-3 h-3 animate-spin" />
                                 ) : (
                                   <>
-                                    <Heart className="w-2.5 h-2.5 sm:w-3 sm:h-3 mr-1" fill="currentColor" />
+                                    <Heart className="w-3 h-3 mr-1" fill="currentColor" />
                                     <span className="hidden sm:inline">Liker</span>
                                     <span className="sm:hidden">♥</span>
                                   </>
@@ -316,9 +314,9 @@ export const LikesHistory: React.FC<LikesHistoryProps> = ({
                                 size="sm"
                                 variant="outline"
                                 onClick={() => handleViewProfile(like.liker_id)}
-                                className="text-[10px] sm:text-xs py-1 px-2 h-6 sm:h-7 flex-1 border border-primary/30 text-primary hover:bg-gradient-to-r hover:from-primary hover:to-accent hover:text-white hover:border-transparent hover:shadow-lg hover:scale-105 transform transition-all duration-200 font-medium bg-white/80"
+                                className="text-xs py-1.5 px-2 sm:px-3 h-7 sm:h-8 flex-1 border border-primary/30 text-primary hover:bg-gradient-to-r hover:from-primary hover:to-accent hover:text-white hover:border-transparent hover:shadow-lg hover:scale-[1.02] transform transition-all duration-200 font-medium bg-white/80"
                               >
-                                <Eye className="w-2.5 h-2.5 sm:w-3 sm:h-3 mr-1" />
+                                <Eye className="w-3 h-3 mr-1" />
                                 <span className="hidden sm:inline">Voir</span>
                                 <span className="sm:hidden">👁</span>
                               </Button>
@@ -336,7 +334,7 @@ export const LikesHistory: React.FC<LikesHistoryProps> = ({
                   <Button
                     variant="outline"
                     onClick={() => navigate('/profile')}
-                    className="text-primary border-2 border-primary/40 hover:bg-gradient-to-r hover:from-primary hover:to-accent hover:text-white hover:border-transparent hover:shadow-xl hover:scale-105 transform transition-all duration-300 font-semibold bg-gradient-to-r from-white to-rose-50/50 px-4 py-2 text-sm"
+                    className="text-primary border-2 border-primary/40 hover:bg-gradient-to-r hover:from-primary hover:to-accent hover:text-white hover:border-transparent hover:shadow-xl hover:scale-[1.02] transform transition-all duration-300 font-semibold bg-gradient-to-r from-white to-rose-50/50 px-4 py-2 text-sm"
                   >
                     Voir tous
                     <Sparkles className="w-3 h-3 ml-1 animate-pulse" />
@@ -371,7 +369,7 @@ export const LikesHistory: React.FC<LikesHistoryProps> = ({
                   <div className="flex items-center gap-2 justify-center sm:justify-start">
                     <div className="flex -space-x-2">
                       {likes.slice(0, 3).map((like, index) => (
-                        <div key={like.id} className={`w-8 h-8 rounded-full border-2 border-white shadow-sm bg-gradient-to-br from-primary to-accent flex items-center justify-center text-white text-xs font-bold transform transition-transform hover:scale-110 ${index === 0 ? 'z-30' : index === 1 ? 'z-20' : 'z-10'}`}>
+                        <div key={like.id} className={`w-8 h-8 rounded-full border-2 border-white shadow-sm bg-gradient-to-br from-primary to-accent flex items-center justify-center text-white text-xs font-bold transform transition-transform hover:scale-105 ${index === 0 ? 'z-30' : index === 1 ? 'z-20' : 'z-10'}`}>
                           {like.first_name[0]}
                         </div>
                       ))}
@@ -399,23 +397,23 @@ export const LikesHistory: React.FC<LikesHistoryProps> = ({
 
       {!compact && (
         <>
-          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4">
+          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
             {likes.map((like) => (
-              <div key={like.id} className="w-full h-full">
-                <Card className="glow-gentle hover:glow-intense transition-all duration-300 group bg-gradient-to-br from-white via-rose-50/30 to-sunset-50/20 border-rose-200/30 hover:border-primary/40 shadow-md hover:shadow-xl transform hover:scale-[1.02] h-full flex flex-col">
+              <div key={like.id} className="w-full h-full" style={{ contain: 'layout' }}>
+                <Card className="glow-gentle hover:glow-intense transition-all duration-300 group bg-gradient-to-br from-white via-rose-50/30 to-sunset-50/20 border-rose-200/30 hover:border-primary/40 shadow-md hover:shadow-xl h-full flex flex-col">
                   <CardContent className="p-3 sm:p-4 relative overflow-hidden flex-1 flex flex-col">
                     <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-primary/5 to-transparent rounded-full -translate-y-8 translate-x-8"></div>
                     
                     {/* Avatar centré */}
                     <div className="flex justify-center mb-3 relative z-10">
                       <div className="w-16 h-16 sm:w-20 sm:h-20 relative">
-                        <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-accent/20 rounded-full animate-pulse group-hover:scale-110 transition-transform duration-300"></div>
+                        <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-accent/20 rounded-full animate-pulse group-hover:scale-105 transition-transform duration-300"></div>
                         <div className="relative w-full h-full border-3 border-white shadow-lg group-hover:border-white/80 transition-all duration-300 rounded-full overflow-hidden bg-gradient-to-br from-primary to-accent flex items-center justify-center">
                           {like.photo_id ? (
                             <img 
-                              src={getPhotoUrl(like.photo_id)}
+                              src={getPhotoUrlLocal(like.photo_id)}
                               alt={`${like.first_name} ${like.last_name}`}
-                              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+                              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                               onError={(e) => {
                                 (e.target as HTMLImageElement).style.display = 'none';
                                 const parent = (e.target as HTMLImageElement).parentElement;
@@ -470,7 +468,7 @@ export const LikesHistory: React.FC<LikesHistoryProps> = ({
                         size="sm"
                         onClick={() => handleLikeBack(like.liker_id)}
                         disabled={likeActions[like.liker_id]}
-                        className="w-full py-2 px-3 bg-gradient-to-r from-primary via-rose-500 to-accent text-white hover:shadow-xl hover:scale-105 transform transition-all duration-300 font-semibold border-0 shadow-lg hover:from-primary/90 hover:to-accent/90 relative overflow-hidden text-xs sm:text-sm"
+                        className="w-full py-2 px-3 bg-gradient-to-r from-primary via-rose-500 to-accent text-white hover:shadow-xl hover:scale-[1.02] transform transition-all duration-300 font-semibold border-0 shadow-lg hover:from-primary/90 hover:to-accent/90 relative overflow-hidden text-xs sm:text-sm"
                       >
                         {likeActions[like.liker_id] ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
@@ -489,7 +487,7 @@ export const LikesHistory: React.FC<LikesHistoryProps> = ({
                         size="sm"
                         variant="outline"
                         onClick={() => handleViewProfile(like.liker_id)}
-                        className="w-full py-2 px-3 border-2 border-primary/30 text-primary hover:bg-gradient-to-r hover:from-primary hover:to-accent hover:text-white hover:border-transparent hover:shadow-lg hover:scale-105 transform transition-all duration-300 font-semibold bg-gradient-to-r from-white to-rose-50/50 text-xs sm:text-sm"
+                        className="w-full py-2 px-3 border-2 border-primary/30 text-primary hover:bg-gradient-to-r hover:from-primary hover:to-accent hover:text-white hover:border-transparent hover:shadow-lg hover:scale-[1.02] transform transition-all duration-300 font-semibold bg-gradient-to-r from-white to-rose-50/50 text-xs sm:text-sm"
                       >
                         <Eye className="w-4 h-4 mr-2" />
                         Voir le profil

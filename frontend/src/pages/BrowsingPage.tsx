@@ -1,14 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Loader2, ServerCrash, Heart, MapPin, UserCheck, Search, X, ThumbsUp, ThumbsDown, Filter, SortAsc, SortDesc, User } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
+import { Loader2, ServerCrash, Heart, MapPin, Search, X, Filter, SortAsc, SortDesc, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { profileApi, CompleteProfile } from '@/services/profileApi';
-import { API_BASE_URL } from '@/services/api';
+import { getPhotoUrl as getStandardPhotoUrl } from '@/utils/imageUtils';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/useToast';
 import { useDialog } from '@/hooks/useDialog';
@@ -17,17 +15,16 @@ import { ConfirmDialog, MatchDialog } from '@/components/ui/dialog';
 const ProfileCard: React.FC<{ 
   profile: CompleteProfile; 
   onLike: (userId: number) => void;
-  onDislike: (userId: number) => void;
   onUnlike?: (userId: number) => void;
   isLiked?: boolean;
   isLoading?: boolean;
-}> = ({ profile, onLike, onDislike, onUnlike, isLiked = false, isLoading = false }) => {
+}> = ({ profile, onLike, onUnlike, isLiked = false, isLoading = false }) => {
   const navigate = useNavigate();
   const profilePhoto = profile.photos?.find(p => p.is_profile_picture) || profile.photos?.[0];
   
+  // Utilisation de l'utilitaire centralisé
   const getPhotoUrl = (photoId: number): string => {
-    const baseUrl = API_BASE_URL.replace('/api', '');
-    return `${baseUrl}/api/photos/${photoId}/image`;
+    return getStandardPhotoUrl(photoId);
   };
 
   return (
@@ -241,26 +238,6 @@ const BrowsingPage: React.FC = () => {
     }
   };
 
-  const handleDislike = async (userId: number) => {
-    try {
-      setLoadingActions(prev => new Set(prev).add(userId));
-      await profileApi.likeProfile(userId, false);
-      // Retirer le profil de la liste SEULEMENT si le dislike a réussi
-      setProfiles(prev => prev.filter(p => p.user_id !== userId));
-    } catch (err: any) {
-      console.error('Erreur lors du dislike:', err);
-      // Afficher l'erreur à l'utilisateur
-      const errorMessage = err.response?.data?.message || 'Erreur lors du dislike';
-      errorToast(errorMessage);
-      // Ne pas retirer le profil de la liste en cas d'erreur
-    } finally {
-      setLoadingActions(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(userId);
-        return newSet;
-      });
-    }
-  };
 
   const handleUnlike = async (userId: number) => {
     try {
@@ -468,7 +445,6 @@ const BrowsingPage: React.FC = () => {
               key={profile.id} 
               profile={profile} 
               onLike={handleLike}
-              onDislike={handleDislike}
               onUnlike={handleUnlike}
               isLiked={false} // Pour le moment, on affiche toujours comme non-liké dans browse
               isLoading={loadingActions.has(profile.user_id)}

@@ -1,9 +1,9 @@
 // Fonction pour construire l'URL d'une photo
 export function getPhotoUrl(photoId: number | string, baseUrl: string = 'http://localhost:3001'): string {
-  return `${baseUrl}/api/profile/photos/${photoId}/image`;
+  return `${baseUrl}/api/photos/${photoId}/image`;
 }
 
-// Fonction pour obtenir la photo de profil principale
+// Fonction pour obtenir la photo de profil principale avec fallback amélioré
 export function getProfilePictureUrl(photos: any[], baseUrl: string = 'http://localhost:3001'): string {
   if (!photos || photos.length === 0) {
     return '/placeholder-avatar.svg'; // Image par défaut
@@ -11,12 +11,18 @@ export function getProfilePictureUrl(photos: any[], baseUrl: string = 'http://lo
   
   // Chercher la photo de profil marquée
   const profilePicture = photos.find(photo => photo.is_profile_picture);
-  if (profilePicture) {
+  if (profilePicture?.id) {
     return getPhotoUrl(profilePicture.id, baseUrl);
   }
   
-  // Sinon, prendre la première photo
-  return getPhotoUrl(photos[0].id, baseUrl);
+  // Sinon, prendre la première photo qui a un ID
+  const firstPhotoWithId = photos.find(photo => photo.id);
+  if (firstPhotoWithId?.id) {
+    return getPhotoUrl(firstPhotoWithId.id, baseUrl);
+  }
+  
+  // Fallback final
+  return '/placeholder-avatar.svg';
 }
 
 // Fonction pour obtenir toutes les URLs des photos d'un profil

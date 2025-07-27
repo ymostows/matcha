@@ -67,6 +67,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (response.success && response.token && response.user) {
         setToken(response.token);
         setUser(response.user);
+        
+        // Charger les données du profil complet après le login
+        try {
+          const profileData = await profileApi.getMyProfile();
+          const updatedUser = {
+            ...response.user,
+            ...profileData,
+          };
+          setUser(updatedUser);
+          localStorage.setItem('user', JSON.stringify(updatedUser));
+        } catch (profileError) {
+          // En cas d'erreur, continuer avec les données utilisateur de base
+          console.warn('Impossible de charger les données du profil:', profileError);
+        }
       } else {
         throw new Error(response.message || 'Erreur de connexion');
       }

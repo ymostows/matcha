@@ -3,6 +3,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '../ui/button';
 import { Heart, User, Home, LogOut, Search, Menu, X } from 'lucide-react';
+import { NotificationBell } from '../notifications/NotificationBell';
 
 export const Header: React.FC = () => {
   const { user, token, logout } = useAuth();
@@ -64,6 +65,10 @@ export const Header: React.FC = () => {
                     {link.label}
                   </Button>
                 ))}
+                
+                {/* Notification Bell */}
+                <NotificationBell />
+                
                 <Button
                   variant="ghost"
                   size="sm" 
@@ -76,7 +81,8 @@ export const Header: React.FC = () => {
               </nav>
 
               {/* Bouton Hamburger pour mobile */}
-              <div className="md:hidden">
+              <div className="md:hidden flex items-center gap-2">
+                <NotificationBell />
                 <Button variant="ghost" size="icon" onClick={() => setIsMenuOpen(!isMenuOpen)}>
                   {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
                 </Button>

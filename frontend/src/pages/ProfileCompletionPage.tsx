@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Heart, Camera, MapPin, ArrowLeft, ArrowRight, Check, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -11,12 +11,6 @@ import { profileApi } from '@/services/profileApi';
 import { useAuth } from '@/contexts/AuthContext';
 import { checkProfileCompletion } from '@/hooks/useProfileCompletion';
 
-interface Step {
-  id: number;
-  title: string;
-  description: string;
-  icon: React.ComponentType<any>;
-}
 
 export const ProfileCompletionPage: React.FC = () => {
   const { user, refreshUser } = useAuth();
@@ -109,7 +103,13 @@ export const ProfileCompletionPage: React.FC = () => {
       if (isComplete) {
         const saved = await saveFullProfile();
         if (saved) {
-          navigate('/dashboard');
+          try {
+            // Marquer le profil comme complet
+            await profileApi.completeProfile();
+            navigate('/dashboard');
+          } catch (error) {
+            setCompletionError("Erreur lors de la finalisation du profil. Veuillez réessayer.");
+          }
         }
       } else {
         setCompletionError(`Veuillez compléter les champs suivants pour terminer : ${missingFields.join(', ')}`);

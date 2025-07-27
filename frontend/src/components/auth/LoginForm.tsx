@@ -57,7 +57,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister }) => {
     try {
       await login(formData.email, formData.password);
       notify.success('Connexion réussie ! Vous allez être redirigé.');
-      navigate('/browsing');
+      navigate('/dashboard');
     } catch (err: any) {
       const errorMessage = err.response?.data?.message || 'Une erreur est survenue lors de la connexion.';
       notify.error(errorMessage);

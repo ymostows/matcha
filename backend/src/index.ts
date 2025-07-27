@@ -7,6 +7,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import path from 'path';
+import { createServer } from 'http';
 import { testConnection } from './config/database';
 import pool from './config/database';
 import authRoutes from './routes/auth';
@@ -14,12 +15,17 @@ import profileRoutes from './routes/profile';
 import photosRoutes from './routes/photos';
 import notificationsRoutes from './routes/notifications';
 import chatRoutes from './routes/chat';
+import dashboardRoutes from './routes/dashboard';
 import { sanitizeInput } from './middleware/sanitization';
 import { initializeEmailTransporter } from './config/email';
 import errorHandler from './middleware/errorHandler';
+import { initializeSocketService } from './services/socketService';
 
 // Créer l'application Express
 const app = express();
+
+// Créer le serveur HTTP
+const httpServer = createServer(app);
 
 // Configuration des middlewares (ordre important !)
 app.use(helmet({
@@ -97,6 +103,9 @@ app.use('/api/notifications', notificationsRoutes);
 // Routes de chat
 app.use('/api/chat', chatRoutes);
 
+// Routes de dashboard
+app.use('/api/dashboard', dashboardRoutes);
+
 // Middleware de gestion des erreurs (doit être le dernier)
 app.use(errorHandler);
 
@@ -115,11 +124,17 @@ const startServer = async () => {
       console.warn('📧 Les emails ne seront pas envoyés mais les fonctionnalités continueront de fonctionner');
     }
     
-    app.listen(PORT, () => {
+    // Initialiser Socket.io
+    const socketService = initializeSocketService(httpServer);
+    console.log('🔌 Service Socket.io initialisé');
+    
+    httpServer.listen(PORT, () => {
       console.log(`🚀 Serveur Matcha démarré sur http://localhost:${PORT}`);
       console.log(`📡 Route de test : http://localhost:${PORT}/api/health`);
       console.log(`🗄️ Test DB : http://localhost:${PORT}/api/test-db`);
       console.log(`🔐 Auth routes : http://localhost:${PORT}/api/auth/*`);
+      console.log(`🔔 Notifications : http://localhost:${PORT}/api/notifications`);
+      console.log(`🔌 WebSocket temps réel activé !`);
       console.log(`🗄️ Base de données connectée avec succès`);
     });
   } catch (error) {

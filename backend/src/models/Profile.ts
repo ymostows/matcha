@@ -23,7 +23,7 @@ export class ProfileModel {
         query = `
           UPDATE profiles 
           SET biography = $2, age = $3, gender = $4, sexual_orientation = $5, 
-              interests = $6, city = $7, updated_at = CURRENT_TIMESTAMP
+              interests = $6, city = $7, isComplete = $8, updated_at = CURRENT_TIMESTAMP
           WHERE user_id = $1
           RETURNING *
         `;
@@ -34,13 +34,14 @@ export class ProfileModel {
           profileData.gender,
           profileData.sexual_orientation,
           profileData.interests,
-          profileData.city
+          profileData.city,
+          (profileData as any).isComplete || false
         ];
       } else {
         // Création
         query = `
-          INSERT INTO profiles (user_id, biography, age, gender, sexual_orientation, interests, city)
-          VALUES ($1, $2, $3, $4, $5, $6, $7)
+          INSERT INTO profiles (user_id, biography, age, gender, sexual_orientation, interests, city, isComplete)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
           RETURNING *
         `;
         values = [
@@ -50,7 +51,8 @@ export class ProfileModel {
           profileData.gender,
           profileData.sexual_orientation,
           profileData.interests,
-          profileData.city
+          profileData.city,
+          (profileData as any).isComplete || false
         ];
       }
       
@@ -91,7 +93,7 @@ export class ProfileModel {
         SELECT 
           u.id, u.username, u.first_name, u.last_name, u.email, u.last_seen,
           p.id as profile_id, p.user_id, p.biography, p.age, p.gender, p.sexual_orientation, 
-          p.interests, p.location_lat, p.location_lng, p.city, p.fame_rating,
+          p.interests, p.location_lat, p.location_lng, p.city, p.fame_rating, p.isComplete,
           p.created_at, p.updated_at
         FROM users u
         LEFT JOIN profiles p ON u.id = p.user_id
@@ -121,6 +123,26 @@ export class ProfileModel {
       profile.photos = photosResult.rows || [];
       
       return profile;
+    } finally {
+      client.release();
+    }
+  }
+
+  // Marquer un profil comme complet
+  static async markAsComplete(userId: number): Promise<Profile | null> {
+    const client = await pool.connect();
+    
+    try {
+      const query = `
+        UPDATE profiles 
+        SET isComplete = true, updated_at = CURRENT_TIMESTAMP
+        WHERE user_id = $1
+        RETURNING *
+      `;
+      
+      const result: QueryResult<Profile> = await client.query(query, [userId]);
+      
+      return result.rows[0] || null;
     } finally {
       client.release();
     }

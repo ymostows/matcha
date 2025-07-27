@@ -9,9 +9,6 @@ import {
   Calendar, 
   User,
   MessageCircle,
-  Star,
-  Eye,
-  Clock,
   CheckCircle,
   Camera,
   Shield,
@@ -25,7 +22,7 @@ import { PhotoViewer } from '../components/ui/PhotoViewer';
 import { ConfirmDialog, MatchDialog } from '../components/ui/dialog';
 import { PromptDialog } from '../components/ui/prompt-dialog';
 import { profileApi, CompleteProfile } from '../services/profileApi';
-import { API_BASE_URL } from '../services/api';
+import { getPhotoUrl as getStandardPhotoUrl } from '../utils/imageUtils';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../hooks/useToast';
 import { useDialog } from '../hooks/useDialog';
@@ -152,16 +149,6 @@ export const ProfilePublicPage: React.FC = () => {
     }
   };
 
-  const calculateAge = (birthDate: string) => {
-    const today = new Date();
-    const birth = new Date(birthDate);
-    let age = today.getFullYear() - birth.getFullYear();
-    const monthDiff = today.getMonth() - birth.getMonth();
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
-      age--;
-    }
-    return age;
-  };
 
   const isUserOnline = (lastSeen: string) => {
     const lastSeenDate = new Date(lastSeen);
@@ -184,9 +171,9 @@ export const ProfilePublicPage: React.FC = () => {
     }
   };
 
+  // Utilisation de l'utilitaire centralisé
   const getPhotoUrl = (photoId: number): string => {
-    const baseUrl = API_BASE_URL.replace('/api', '');
-    return `${baseUrl}/api/photos/${photoId}/image`;
+    return getStandardPhotoUrl(photoId);
   };
 
   // Ouvrir la visionneuse de photos

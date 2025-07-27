@@ -1,51 +1,112 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Heart, MapPin, MessageCircle, Star, Users, Zap, Target, Eye, Edit } from 'lucide-react';
+import { Heart, MessageCircle, Star, Zap, Target, Eye, Edit } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useProfileCompletion } from '../../hooks/useProfileCompletion';
+import { useSocket } from '../../contexts/SocketContext';
 import { Button } from '../ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
+import { Card, CardContent } from '../ui/card';
 import { LikesHistory } from '../matches/LikesHistory';
+import { MatchesSection } from './MatchesSection';
+import { profileApi, CompleteProfile } from '../../services/profileApi';
+import { getProfilePictureUrl } from '../../utils/imageUtils';
 
 export const UserDashboard: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { completionPercentage, isLoading: profileLoading } = useProfileCompletion();
+  const { notifications } = useSocket();
 
-  // Données fictives pour le design
-  const stats = {
-    likes: 42,
-    matches: 18,
-    messages: 7,
-    visits: 156
+  // États pour les vraies données
+  const [stats, setStats] = useState({
+    likes: 0,
+    matches: 0,
+    messages: 0,
+    visits: 0
+  });
+  const [userProfile, setUserProfile] = useState<CompleteProfile | null>(null);
+  // Removed recentMatches state and isLoadingStats as they're now handled by MatchesSection
+
+  // Fonction pour rafraîchir les statistiques
+  const refreshStats = async () => {
+    try {
+      const response = await fetch('http://localhost:3001/api/dashboard/stats', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setStats(data.stats);
+      }
+    } catch (error) {
+      console.error('Erreur lors du rafraîchissement des statistiques:', error);
+    }
   };
 
-  const recentMatches = [
-    { id: 1, name: "Sophie", age: 25, image: "https://images.unsplash.com/photo-1494790108755-2616b0c8aa2c?w=100&h=100&fit=crop&crop=face" },
-    { id: 2, name: "Marie", age: 28, image: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face" },
-    { id: 3, name: "Julie", age: 24, image: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100&h=100&fit=crop&crop=face" }
-  ];
+  // Charger les vraies données
+  useEffect(() => {
+    const loadDashboardData = async () => {
+      try {
+        // Charger le profil utilisateur avec photos
+        const profileData = await profileApi.getMyProfile();
+        setUserProfile(profileData);
+        
+        // Charger toutes les statistiques
+        await refreshStats();
+        
+      } catch (error) {
+        console.error('Erreur lors du chargement des données du dashboard:', error);
+        // Garder les valeurs par défaut (0) en cas d'erreur
+      }
+    };
+
+    if (user) {
+      loadDashboardData();
+    }
+  }, [user]);
+
+  // Mettre à jour les stats quand de nouvelles notifications arrivent
+  useEffect(() => {
+    if (notifications.length > 0) {
+      // Détecter les nouveaux événements qui affectent les compteurs
+      const recentNotifications = notifications.filter(n => 
+        new Date(n.created_at).getTime() > Date.now() - 10000 // Dernières 10 secondes
+      );
+      
+      const hasRelevantUpdates = recentNotifications.some(n => 
+        ['like', 'match', 'visit', 'message', 'unlike'].includes(n.type)
+      );
+      
+      if (hasRelevantUpdates) {
+        // Mise à jour des compteurs suite aux notifications
+        refreshStats();
+      }
+    }
+  }, [notifications]);
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
+    <div className="max-w-7xl mx-auto px-4 py-4 sm:py-6 pb-8">
       {/* Welcome Section améliorée */}
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="mb-8"
+        className="mb-4"
       >
         <Card className="bg-gradient-to-r from-primary/10 via-sunset/5 to-peach/10 border-0 shadow-xl overflow-hidden relative">
           <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent"></div>
-          <CardContent className="p-6 sm:p-8 relative">
+          <CardContent className="p-4 sm:p-6 relative">
             <div className="flex flex-col sm:flex-row items-center justify-between text-center sm:text-left">
               <div className="mb-6 sm:mb-0">
                 <motion.h2 
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.2 }}
-                  className="text-4xl font-display font-bold text-twilight mb-3"
+                  className="text-3xl font-display font-bold text-twilight mb-2"
                 >
                   Bonjour {user?.first_name || user?.username} ! 
                   <motion.span 
@@ -61,7 +122,7 @@ export const UserDashboard: React.FC = () => {
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.3 }}
-                  className="text-twilight/70 text-lg mb-4"
+                  className="text-twilight/70 text-base mb-3"
                 >
                   Prêt(e) à faire de nouvelles rencontres aujourd'hui ?
                 </motion.p>
@@ -71,11 +132,18 @@ export const UserDashboard: React.FC = () => {
                   transition={{ delay: 0.4 }}
                   className="flex flex-col sm:flex-row gap-3"
                 >
-                  <Button className="bg-peach-gradient hover:shadow-lg transition-all duration-200">
+                  <Button 
+                    onClick={() => navigate('/browsing')}
+                    className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+                  >
                     <Zap className="w-4 h-4 mr-2" />
                     Commencer à matcher
                   </Button>
-                  <Button variant="outline" className="border-primary/30 text-primary hover:bg-primary/5">
+                  <Button 
+                    onClick={() => navigate('/browsing')}
+                    variant="outline" 
+                    className="border-2 border-primary/40 text-primary hover:bg-primary/10 hover:border-primary/60 font-semibold shadow-md hover:shadow-lg transition-all duration-300"
+                  >
                     <Target className="w-4 h-4 mr-2" />
                     Découvrir des profils
                   </Button>
@@ -87,9 +155,33 @@ export const UserDashboard: React.FC = () => {
                 transition={{ delay: 0.5, type: "spring" }}
                 className="hidden sm:block"
               >
-                <div className="w-24 h-24 bg-peach-gradient rounded-full flex items-center justify-center shadow-2xl relative">
-                  <Heart className="w-12 h-12 text-white" fill="currentColor" />
-                  <div className="absolute inset-0 bg-white/20 rounded-full animate-ping"></div>
+                <div className="w-20 h-20 rounded-full shadow-2xl relative overflow-hidden border-3 border-white/50">
+                  {userProfile?.photos && userProfile.photos.length > 0 ? (
+                    <img 
+                      src={getProfilePictureUrl(userProfile.photos)}
+                      alt="Profile"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        // Fallback en cas d'erreur d'image
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                        const parent = target.parentElement;
+                        if (parent && !parent.querySelector('.fallback-avatar')) {
+                          parent.innerHTML = `
+                            <div class="fallback-avatar w-full h-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+                              <span class="text-white font-bold text-lg">${(user?.first_name || user?.username || 'U').charAt(0)}</span>
+                            </div>
+                          `;
+                        }
+                      }}
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+                      <Heart className="w-10 h-10 text-white" fill="currentColor" />
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-primary/20 to-transparent rounded-full"></div>
+                  <div className="absolute inset-0 border-2 border-white/30 rounded-full animate-pulse"></div>
                 </div>
               </motion.div>
             </div>
@@ -97,177 +189,105 @@ export const UserDashboard: React.FC = () => {
         </Card>
       </motion.div>
 
-      {/* Stats Cards améliorées */}
+      {/* Compteurs dans le thème du site */}
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
-        className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 mb-8"
+        className="flex gap-3 sm:gap-4 mb-6 justify-between"
       >
         {[
-          { icon: Heart, value: stats.likes, label: "Likes reçus", color: "text-primary", bgColor: "bg-primary/10" },
-          { icon: Star, value: stats.matches, label: "Matches", color: "text-sunset", bgColor: "bg-sunset/10" },
-          { icon: MessageCircle, value: stats.messages, label: "Messages", color: "text-accent", bgColor: "bg-accent/10" },
-          { icon: MapPin, value: stats.visits, label: "Visites", color: "text-blue-600", bgColor: "bg-blue-50" }
+          { icon: Heart, value: stats.likes, label: "Likes", color: "text-primary" },
+          { icon: Star, value: stats.matches, label: "Matches", color: "text-sunset" },
+          { icon: MessageCircle, value: stats.messages, label: "Messages", color: "text-accent" },
+          { icon: Eye, value: stats.visits, label: "Vues", color: "text-twilight" }
         ].map((stat, index) => (
           <motion.div
             key={stat.label}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 * index }}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+            whileHover={{ scale: 1.02 }}
+            className="flex-1"
           >
-            <Card className="text-center hover:shadow-lg transition-all duration-300 border-0 bg-white/80 backdrop-blur-sm">
-              <CardContent className="p-6">
-                <div className={`w-12 h-12 ${stat.bgColor} rounded-full mx-auto mb-4 flex items-center justify-center`}>
-                  <stat.icon className={`w-6 h-6 ${stat.color}`} fill={stat.icon === Heart || stat.icon === Star ? "currentColor" : "none"} />
-                </div>
-                <div className="text-3xl font-bold text-twilight mb-1">{stat.value}</div>
-                <div className="text-sm text-twilight/60 font-medium">{stat.label}</div>
-              </CardContent>
-            </Card>
+            <div className="bg-white/70 backdrop-blur-sm rounded-lg p-3 text-center border-0 shadow-md hover:shadow-lg transition-all duration-300">
+              <div className={`w-8 h-8 mx-auto mb-2 bg-gradient-to-br from-primary/10 to-sunset/10 rounded-full flex items-center justify-center`}>
+                <stat.icon 
+                  className={`w-4 h-4 ${stat.color}`} 
+                  fill={stat.icon === Heart || stat.icon === Star ? "currentColor" : "none"}
+                />
+              </div>
+              <div className="text-xl font-bold text-twilight mb-1">{stat.value}</div>
+              <div className="text-xs text-twilight/60 font-medium">{stat.label}</div>
+            </div>
           </motion.div>
         ))}
       </motion.div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-        {/* Profile Section améliorée */}
+      {/* Notification profil incomplet uniquement */}
+      {completionPercentage < 100 && !profileLoading && (
+        <motion.div 
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="mb-6"
+        >
+          <Card className="border-l-4 border-l-sunset bg-gradient-to-r from-sunset/10 to-primary/5 shadow-md">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-sunset rounded-full flex items-center justify-center">
+                    <Heart className="w-5 h-5 text-white" fill="currentColor" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-twilight">Complétez votre profil</h4>
+                    <p className="text-sm text-twilight/70">
+                      Votre profil est à {completionPercentage}% - Ajoutez plus d'infos pour plus de matches !
+                    </p>
+                  </div>
+                </div>
+                <Button 
+                  onClick={() => navigate('/profile-edit')}
+                  size="sm"
+                  className="bg-gradient-to-r from-sunset to-primary text-white hover:shadow-lg transition-all duration-200"
+                >
+                  <Edit className="w-4 h-4 mr-2" />
+                  Compléter
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
+
+      {/* Sections principales : Matches et Likes */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 lg:gap-6 auto-rows-fr min-h-0">
+        {/* Matches section - Gauche */}
         <motion.div 
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.3 }}
-          className="lg:col-span-1"
-        >
-          <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm overflow-hidden">
-            <CardHeader className="bg-gradient-to-r from-primary/5 to-sunset/5 border-b border-primary/10">
-              <CardTitle className="flex items-center gap-2">
-                <Heart className="w-5 h-5 text-primary" fill="currentColor" />
-                Mon Profil
-              </CardTitle>
-              <CardDescription>
-                Complétez votre profil pour maximiser vos chances
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-6 space-y-6">
-              <div className="text-center">
-                <motion.div 
-                  whileHover={{ scale: 1.05 }}
-                  className="w-28 h-28 bg-peach-gradient rounded-full mx-auto mb-4 flex items-center justify-center shadow-xl cursor-pointer relative"
-                >
-                  <span className="text-3xl font-bold text-white">
-                    {user?.first_name?.charAt(0) || user?.username?.charAt(0) || 'U'}
-                  </span>
-                </motion.div>
-                <h3 className="font-display font-semibold text-twilight text-xl mb-1">
-                  {user?.first_name} {user?.last_name}
-                </h3>
-                <p className="text-twilight/60 mb-4">@{user?.username}</p>
-              </div>
-              
-              <div className="space-y-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-twilight/60">Profil complété</span>
-                  <span className="text-primary font-medium">
-                    {profileLoading ? '...' : `${completionPercentage}%`}
-                  </span>
-                </div>
-                <div className="w-full bg-secondary/30 rounded-full h-3 overflow-hidden">
-                  <motion.div 
-                    initial={{ width: 0 }}
-                    animate={{ width: profileLoading ? "0%" : `${completionPercentage}%` }}
-                    transition={{ delay: 0.5, duration: 1 }}
-                    className="bg-peach-gradient h-3 rounded-full"
-                  ></motion.div>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Button 
-                  onClick={() => navigate('/profile')}
-                  variant="outline"
-                  className="w-full border-primary/30 text-primary hover:bg-primary/5"
-                >
-                  <Eye className="w-4 h-4 mr-2" />
-                  Voir mon profil public
-                </Button>
-                
-                <Button 
-                  onClick={() => navigate('/profile-edit')}
-                  className="w-full bg-gradient-to-r from-primary to-sunset hover:shadow-lg transition-all duration-200"
-                >
-                  <Edit className="w-4 h-4 mr-2" />
-                  Modifier mon profil
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        {/* Matches récents améliorés */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
-          className="lg:col-span-2"
+          className="min-h-0 flex flex-col"
         >
-          <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm">
-            <CardHeader className="bg-gradient-to-r from-sunset/5 to-peach/5 border-b border-primary/10">
-              <CardTitle className="flex items-center gap-2">
-                <Users className="w-5 h-5 text-sunset" />
-                Matches récents
-              </CardTitle>
-              <CardDescription>
-                Vos nouvelles connexions vous attendent
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-6">
-              <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4">
-                {recentMatches.map((match, index) => (
-                  <motion.div
-                    key={match.id}
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: 0.1 * index }}
-                    whileHover={{ scale: 1.05 }}
-                    className="bg-gradient-to-br from-primary/5 to-sunset/5 p-4 rounded-xl text-center border border-primary/10 hover:shadow-md transition-all duration-200 cursor-pointer"
-                  >
-                    <img 
-                      src={match.image} 
-                      alt={match.name}
-                      className="w-16 h-16 rounded-full mx-auto mb-3 object-cover shadow-lg"
-                    />
-                    <h4 className="font-semibold text-twilight">{match.name}</h4>
-                    <p className="text-sm text-twilight/60">{match.age} ans</p>
-                    <Button size="sm" variant="ghost" className="mt-2 text-primary hover:bg-primary/10">
-                      <MessageCircle className="w-4 h-4 mr-1" />
-                      Message
-                    </Button>
-                  </motion.div>
-                ))}
-              </div>
-              
-              <div className="mt-6 text-center">
-                <Button variant="outline" className="border-primary/30 text-primary hover:bg-primary/5">
-                  Voir tous les matches
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="flex-1 max-h-[500px] xl:max-h-[600px] overflow-hidden">
+            <MatchesSection limit={6} />
+          </div>
         </motion.div>
 
-        {/* Likes reçus */}
+        {/* Likes reçus - Droite */}
         <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.5 }}
-          className="lg:col-span-1"
+          className="min-h-0 flex flex-col"
         >
-          <LikesHistory 
-            limit={6}
-            showHeader={false}
-            compact={true}
-          />
+          <div className="flex-1 max-h-[500px] xl:max-h-[600px] overflow-hidden">
+            <LikesHistory 
+              limit={6}
+              showHeader={false}
+              compact={true}
+            />
+          </div>
         </motion.div>
       </div>
     </div>

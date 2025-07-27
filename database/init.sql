@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   latitude DECIMAL(10, 8),
   longitude DECIMAL(11, 8),
   fame_rating INTEGER DEFAULT 0,
+  isComplete BOOLEAN DEFAULT false NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -112,5 +113,6 @@ CREATE INDEX IF NOT EXISTS idx_likes_liked_id ON likes(liked_id);
 CREATE INDEX IF NOT EXISTS idx_matches_users ON matches(user1_id, user2_id);
 CREATE INDEX IF NOT EXISTS idx_messages_match_id ON messages(match_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_profiles_isComplete ON profiles(isComplete);
 
 SELECT 'Base de données Matcha initialisée avec succès!' as message; 

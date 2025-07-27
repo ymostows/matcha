@@ -49,7 +49,6 @@ export const Select: React.FC<SelectProps> = ({ value, onValueChange, children }
 export const SelectTrigger: React.FC<SelectTriggerProps & any> = ({ 
   className, 
   children, 
-  value, 
   isOpen, 
   setIsOpen 
 }) => {
