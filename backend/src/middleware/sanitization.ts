@@ -8,20 +8,25 @@ export const sanitizeHtml = (str: string): string => {
 };
 
 // Fonction pour nettoyer récursivement un objet
-export const sanitizeObject = (obj: any): any => {
+export const sanitizeObject = (obj: any, excludeKeys: string[] = []): any => {
   if (typeof obj === 'string') {
     return sanitizeHtml(obj);
   }
   
   if (Array.isArray(obj)) {
-    return obj.map(item => sanitizeObject(item));
+    return obj.map(item => sanitizeObject(item, excludeKeys));
   }
   
   if (obj && typeof obj === 'object') {
     const sanitized: any = {};
     for (const key in obj) {
       if (obj.hasOwnProperty(key)) {
-        sanitized[key] = sanitizeObject(obj[key]);
+        // Ne pas sanitizer les clés exclues (comme les mots de passe)
+        if (excludeKeys.includes(key)) {
+          sanitized[key] = obj[key];
+        } else {
+          sanitized[key] = sanitizeObject(obj[key], excludeKeys);
+        }
       }
     }
     return sanitized;
@@ -32,12 +37,15 @@ export const sanitizeObject = (obj: any): any => {
 
 // Middleware pour sanitiser automatiquement req.body
 export const sanitizeInput = (req: Request, res: Response, next: NextFunction): void => {
+  // Clés à exclure de la sanitisation (mots de passe, tokens, etc.)
+  const excludeKeys = ['password', 'token', 'verification_token', 'reset_token'];
+  
   if (req.body && typeof req.body === 'object') {
-    req.body = sanitizeObject(req.body);
+    req.body = sanitizeObject(req.body, excludeKeys);
   }
   
   if (req.query && typeof req.query === 'object') {
-    req.query = sanitizeObject(req.query);
+    req.query = sanitizeObject(req.query, excludeKeys);
   }
   
   next();
