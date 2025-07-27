@@ -16,6 +16,8 @@
     "generate:realistic": "node src/scripts/generateWithRealPhotos.js",
     "generate:ai": "ts-node src/scripts/generateAIProfiles.ts",
     "generate:photos": "ts-node src/scripts/generateProfilesWithPhotos.ts",
+    "seed:500": "node src/scripts/generateProfiles.js",
+    "reset:profiles": "npm run clean:complete && npm run seed:500",
     "ts-node": "ts-node",
     "test": "jest",
     "test:watch": "jest --watch"

@@ -13,7 +13,8 @@ services:
       - "5433:5432"  # Port externe 5433 pour éviter le conflit
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+      - ./database/init.sql:/docker-entrypoint-initdb.d/01-init.sql
+      - ./database/migrations:/docker-entrypoint-initdb.d/migrations
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U matcha_user -d matcha_db"]
