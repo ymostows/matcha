@@ -1,17 +1,17 @@
 -- Schéma unifié de la base de données Matcha
--- Version: 2.1 - CORRECTION MAJEURE - Aligné sur les modèles TypeScript réels
+-- Version: 2.0 - Fusionné avec toutes les migrations
 -- Date: 2025-07-27
--- Ce fichier remplace init.sql et corrige les incohérences détectées
+-- Ce fichier remplace init.sql et toutes les migrations pour éviter les conflits
 
 -- Extensions PostgreSQL utiles
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- ========================================
--- TABLES PRINCIPALES - NOMS CORRECTS
+-- TABLES PRINCIPALES
 -- ========================================
 
--- Table des utilisateurs (avec les VRAIS noms de colonnes utilisés par le code)
+-- Table des utilisateurs
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
   username VARCHAR(50) UNIQUE NOT NULL,
@@ -19,17 +19,14 @@ CREATE TABLE IF NOT EXISTS users (
   first_name VARCHAR(50) NOT NULL,
   last_name VARCHAR(50) NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
-  is_verified BOOLEAN DEFAULT FALSE,  -- CORRIGÉ: était email_verified, code utilise is_verified
-  verification_token VARCHAR(255),
-  verification_token_expires TIMESTAMP,  -- Ajouté car utilisé par le code
-  reset_password_token VARCHAR(255),     -- Ajouté car utilisé par le code  
-  reset_password_expires TIMESTAMP,      -- Ajouté car utilisé par le code
+  email_verified BOOLEAN DEFAULT FALSE,
+  email_verification_token VARCHAR(255),
   last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Table des profils (avec les VRAIS noms de colonnes utilisés par le code)
+-- Table des profils (avec isComplete déjà inclus)
 CREATE TABLE IF NOT EXISTS profiles (
   id SERIAL PRIMARY KEY,
   user_id INTEGER UNIQUE REFERENCES users(id) ON DELETE CASCADE,
@@ -39,10 +36,10 @@ CREATE TABLE IF NOT EXISTS profiles (
   sexual_orientation VARCHAR(10) CHECK (sexual_orientation IN ('hetero', 'homo', 'bi')),
   interests TEXT[], -- Array de strings pour les intérêts
   city VARCHAR(100),
-  location_lat DECIMAL(10, 8),  -- CORRIGÉ: était latitude, code utilise location_lat
-  location_lng DECIMAL(11, 8),  -- CORRIGÉ: était longitude, code utilise location_lng
+  latitude DECIMAL(10, 8),
+  longitude DECIMAL(11, 8),
   fame_rating INTEGER DEFAULT 0,
-  iscomplete BOOLEAN DEFAULT false NOT NULL,  -- CORRIGÉ: était isComplete, DB utilise iscomplete (lowercase)
+  isComplete BOOLEAN DEFAULT false NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -86,18 +83,18 @@ CREATE TABLE IF NOT EXISTS profile_visits (
 );
 
 -- ========================================
--- TABLES TEMPS RÉEL (avec noms corrigés)
+-- TABLES TEMPS RÉEL (fusion des migrations)
 -- ========================================
 
--- Table des notifications (version corrigée selon l'usage réel)
+-- Table des notifications (version unifiée avec toutes les améliorations)
 CREATE TABLE IF NOT EXISTS notifications (
   id SERIAL PRIMARY KEY,
   user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
   type VARCHAR(50) NOT NULL, -- 'like', 'match', 'message', 'visit'
-  message TEXT NOT NULL DEFAULT '',
+  message TEXT NOT NULL,
   data JSONB, -- Données additionnelles en JSON pour flexibilité
-  is_read BOOLEAN DEFAULT FALSE, -- Nom cohérent utilisé partout
-  from_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,  -- CORRIGÉ: était related_user_id
+  is_read BOOLEAN DEFAULT FALSE, -- Nom unifié (pas de conflit read/is_read)
+  related_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -122,7 +119,7 @@ CREATE TABLE IF NOT EXISTS conversations (
   CONSTRAINT check_different_users CHECK (user1_id != user2_id)
 );
 
--- Table des messages (version améliorée, sans conflit avec match_id)
+-- Table des messages (version améliorée)
 CREATE TABLE IF NOT EXISTS messages (
   id SERIAL PRIMARY KEY,
   match_id INTEGER REFERENCES matches(id) ON DELETE CASCADE,
@@ -135,15 +132,15 @@ CREATE TABLE IF NOT EXISTS messages (
 );
 
 -- ========================================
--- INDEX POUR PERFORMANCES (avec vrais noms de colonnes)
+-- INDEX POUR PERFORMANCES
 -- ========================================
 
 -- Index de base
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
 CREATE INDEX IF NOT EXISTS idx_profiles_user_id ON profiles(user_id);
-CREATE INDEX IF NOT EXISTS idx_profiles_location ON profiles(location_lat, location_lng);  -- CORRIGÉ
-CREATE INDEX IF NOT EXISTS idx_profiles_iscomplete ON profiles(iscomplete);  -- CORRIGÉ
+CREATE INDEX IF NOT EXISTS idx_profiles_location ON profiles(latitude, longitude);
+CREATE INDEX IF NOT EXISTS idx_profiles_isComplete ON profiles(isComplete);
 CREATE INDEX IF NOT EXISTS idx_photos_user_id ON photos(user_id);
 CREATE INDEX IF NOT EXISTS idx_likes_liker_id ON likes(liker_id);
 CREATE INDEX IF NOT EXISTS idx_likes_liked_id ON likes(liked_id);
@@ -201,12 +198,12 @@ CREATE TRIGGER trigger_create_conversation
 -- Mettre à jour les profils existants qui sont déjà complets
 -- (au cas où ce script est exécuté sur une base existante)
 UPDATE profiles 
-SET iscomplete = true 
+SET isComplete = true 
 WHERE biography IS NOT NULL 
   AND age IS NOT NULL 
   AND gender IS NOT NULL 
   AND sexual_orientation IS NOT NULL
-  AND iscomplete = false;
+  AND isComplete = false;
 
 -- Message de confirmation
-SELECT 'Base de données Matcha initialisée avec succès - Schéma unifié v2.1 CORRIGÉ!' as message;
+SELECT 'Base de données Matcha initialisée avec succès - Schéma unifié v2.0!' as message;

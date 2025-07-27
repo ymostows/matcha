@@ -15,6 +15,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./database/init.sql:/docker-entrypoint-initdb.d/01-init.sql
       - ./database/verify-schema.sql:/docker-entrypoint-initdb.d/verify-schema.sql
+      - ./database/verify-schema-v21.sql:/docker-entrypoint-initdb.d/verify-schema-v21.sql
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U matcha_user -d matcha_db"]
