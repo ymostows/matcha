@@ -7,7 +7,7 @@ settings:
 
 ## Project Overview
 
-Web Matcha is a modern dating application built with React, Express.js, and PostgreSQL. The architecture is a full-stack monorepo with separate frontend and backend services containerized with Docker.
+Web Matcha is a modern dating application built with React, Express.js, and Neon PostgreSQL. The architecture is a full-stack monorepo with separate frontend and backend services containerized with Docker, using Neon as the cloud database.
 
 ## Functional Objective
 
@@ -40,19 +40,15 @@ Matcha is a dating application where users can:
 
 ### Starting the Application
 ```bash
-# Full application with Docker (recommended)
+# Full application with Neon Database (recommended)
 docker-compose up
 
-# With Neon database (no local postgres)
-docker-compose -f docker-compose.neon.yml up
-
-# Start development with script
+# Start development with script (includes Neon checks)
 ./start-dev.sh
 
 # Individual services
 docker-compose up backend
 docker-compose up frontend
-docker-compose up postgres
 ```
 
 ### Backend Development (backend/)
@@ -105,7 +101,7 @@ npm run preview
 
 ### Backend (Express.js + TypeScript)
 - **Entry Point**: `backend/src/index.ts` - Main server configuration with security middleware (helmet, CORS, sanitization)
-- **Database**: PostgreSQL with connection pooling via `backend/src/config/database.ts`
+- **Database**: Neon PostgreSQL with connection pooling via `backend/src/config/database.ts`
 - **Authentication**: JWT-based auth with email verification flow
 - **Routes**: 
   - `/api/auth/*` - Authentication endpoints
@@ -134,10 +130,9 @@ PostgreSQL with the following key tables:
 - Additional tables for likes, matches, notifications, visits, blocks, reports
 
 ### Docker Configuration
-- **postgres**: PostgreSQL 15 on port 5433 with health checks
-- **backend**: Express.js API on port 3001 with volume mounting for hot reload
+- **backend**: Express.js API on port 3001 with volume mounting for hot reload, connected to Neon Database
 - **frontend**: React dev server on port 5173 with Vite
-- **adminer**: Database administration interface on port 8080
+- **database**: Neon PostgreSQL cloud database (no local PostgreSQL service)
 
 ## Development Workflow
 
@@ -162,11 +157,10 @@ Photos are stored as base64 data in the database with metadata. The system suppo
 
 ## Testing & Database
 
-Access database via Adminer at http://localhost:8080:
-- Server: postgres
-- User: matcha_user
-- Password: matcha_password
-- Database: matcha_db
+The application uses Neon PostgreSQL cloud database. Configure your DATABASE_URL in the .env file:
+```
+DATABASE_URL=postgresql://username:password@ep-hostname.region.neon.tech/neondb?sslmode=require
+```
 
 The application includes extensive database scripts for generating test data and managing database state during development.
 

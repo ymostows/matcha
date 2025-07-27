@@ -19,7 +19,6 @@
     "generate:test": "ts-node src/scripts/generateTestProfiles.ts",
     "add:photos": "ts-node src/scripts/addPhotosToProfiles.ts",
     "verify:profiles": "ts-node src/scripts/verifyProfiles.ts",
-    "setup:local": "ts-node src/scripts/setupLocalDb.ts",
     "seed:20": "npm run generate:test 20 && npm run add:photos",
     "seed:500": "node src/scripts/generateProfiles.js",
     "reset:profiles": "npm run clean:complete && npm run seed:500",

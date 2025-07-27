@@ -1,41 +1,14 @@
 version: '3.8'
 
 services:
-  # Base de données PostgreSQL
-  postgres:
-    image: postgres:15-alpine
-    container_name: matcha-db
-    environment:
-      POSTGRES_DB: matcha_db
-      POSTGRES_USER: matcha_user
-      POSTGRES_PASSWORD: matcha_password
-    ports:
-      - "5433:5432"  # Port externe 5433 pour éviter le conflit
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./database/init.sql:/docker-entrypoint-initdb.d/01-init.sql
-      - ./database/verify-schema.sql:/docker-entrypoint-initdb.d/verify-schema.sql
-      - ./database/verify-schema-v21.sql:/docker-entrypoint-initdb.d/verify-schema-v21.sql
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U matcha_user -d matcha_db"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   # Backend Express.js avec Neon Database
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: matcha-backend
+    container_name: matcha-backend-neon
     env_file:
       - ./backend/.env
-    environment:
-      - NODE_ENV=development
-      - PORT=3001
-      - FRONTEND_URL=http://localhost:5173
-      - CORS_ORIGINS=http://localhost:5173,http://localhost:5174,http://localhost:3000
     ports:
       - "3001:3001"
     volumes:
@@ -53,7 +26,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: matcha-frontend
+    container_name: matcha-frontend-neon
     environment:
       - NODE_ENV=development
       - VITE_API_URL=http://localhost:3001/api
@@ -66,17 +39,6 @@ services:
       - backend
     restart: unless-stopped
 
-  # Adminer pour gérer la base de données
-  adminer:
-    image: adminer:4.8.1
-    container_name: matcha-adminer
-    ports:
-      - "8080:8080"
-    depends_on:
-      - postgres
-    restart: unless-stopped
-
 volumes:
-  postgres_data:
   backend_node_modules:
-  frontend_node_modules: 
+  frontend_node_modules:

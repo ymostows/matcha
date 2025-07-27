@@ -5,14 +5,10 @@ const crypto = require('crypto');
 const https = require('https');
 const http = require('http');
 
-// Configuration base de données - Auto-détection Docker vs local
-const isDocker = process.env.NODE_ENV === 'development' && process.env.DATABASE_URL;
+// Configuration base de données - Neon uniquement
 const pool = new Pool({
-  host: process.env.DB_HOST || (isDocker ? 'postgres' : 'localhost'),
-  port: process.env.DB_PORT || (isDocker ? 5432 : 5433),
-  database: process.env.DB_NAME || 'matcha_db',
-  user: process.env.DB_USER || 'matcha_user',
-  password: process.env.DB_PASSWORD || 'matcha_password',
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.DATABASE_URL?.includes('neon.tech') ? { rejectUnauthorized: false } : false
 });
 
 // Sources d'images

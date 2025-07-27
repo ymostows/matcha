@@ -1,12 +1,11 @@
 const { Pool } = require('pg');
 
-// Database connection
+require('dotenv').config();
+
+// Database connection - Neon uniquement
 const pool = new Pool({
-  host: 'localhost',
-  port: 5433,
-  user: 'matcha_user',
-  password: 'matcha_password',
-  database: 'matcha_db'
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.DATABASE_URL?.includes('neon.tech') ? { rejectUnauthorized: false } : false
 });
 
 // Data for diverse profiles
