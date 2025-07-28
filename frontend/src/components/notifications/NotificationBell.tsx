@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Bell, X, Clock, Heart, Eye, MessageCircle, UserMinus, RefreshCw } from 'lucide-react';
+import { Bell, X, Clock, Heart, Eye, MessageCircle, UserMinus } from 'lucide-react';
 import { Button } from '../ui/button';
 import { useSocket } from '../../contexts/SocketContext';
 
@@ -89,22 +89,9 @@ const NotificationItem: React.FC<NotificationItemProps> = ({ notification }) => 
 };
 
 export const NotificationBell: React.FC = () => {
-  const { notifications, unreadCount, markNotificationRead, isConnected, refreshNotifications } = useSocket();
+  const { notifications, unreadCount, refreshNotifications } = useSocket();
   const [isOpen, setIsOpen] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Auto-refresh seulement si pas connecté en temps réel
-  React.useEffect(() => {
-    if (!isConnected) {
-      const interval = setInterval(() => {
-        if (!isRefreshing) {
-          refreshNotifications();
-        }
-      }, 30000); // 30 secondes
-
-      return () => clearInterval(interval);
-    }
-  }, [isConnected, isRefreshing, refreshNotifications]);
 
 
   const handleMarkAllAsRead = async () => {
@@ -135,16 +122,6 @@ export const NotificationBell: React.FC = () => {
     setIsOpen(false);
   };
 
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    try {
-      await refreshNotifications();
-    } catch (error) {
-      console.error('❌ Erreur lors de l\'actualisation:', error);
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
 
   const recentNotifications = notifications.slice(0, 10);
 
@@ -192,16 +169,6 @@ export const NotificationBell: React.FC = () => {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={handleRefresh}
-                    disabled={isRefreshing}
-                    className="text-xs px-2 py-1 h-auto hover:bg-blue-50 hover:text-blue-600"
-                  >
-                    <RefreshCw className={`w-3 h-3 mr-1 ${isRefreshing ? 'animate-spin text-blue-600' : ''}`} />
-                    {isRefreshing ? 'Actualisation...' : 'Actualiser'}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
                     onClick={handleClose}
                     className="p-1 h-6 w-6"
                   >
@@ -210,13 +177,6 @@ export const NotificationBell: React.FC = () => {
                 </div>
               </div>
               
-              {/* Indicateur de statut */}
-              <div className="flex items-center gap-2 mt-3">
-                <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
-                <span className="text-xs text-gray-600 font-medium">
-                  Actualisation automatique (5s)
-                </span>
-              </div>
             </div>
 
             {/* Liste des notifications */}
