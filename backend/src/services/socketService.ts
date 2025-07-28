@@ -212,7 +212,7 @@ export class SocketService {
         id: savedNotification.id,
         type: savedNotification.type,
         message: savedNotification.message,
-        data: savedNotification.data ? JSON.parse(savedNotification.data) : null,
+        data: savedNotification.data || null,
         is_read: savedNotification.is_read,
         created_at: savedNotification.created_at
       });

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Bell, X, Check, Clock, Heart, Eye, MessageCircle, UserMinus, RefreshCw } from 'lucide-react';
+import { Bell, X, Clock, Heart, Eye, MessageCircle, UserMinus, RefreshCw } from 'lucide-react';
 import { Button } from '../ui/button';
 import { useSocket } from '../../contexts/SocketContext';
 
@@ -12,10 +12,9 @@ interface NotificationItemProps {
     is_read: boolean;
     created_at: string;
   };
-  onMarkAsRead: (id: number) => void;
 }
 
-const NotificationItem: React.FC<NotificationItemProps> = ({ notification, onMarkAsRead }) => {
+const NotificationItem: React.FC<NotificationItemProps> = ({ notification }) => {
   const getIcon = (type: string) => {
     switch (type) {
       case 'like':
@@ -62,8 +61,7 @@ const NotificationItem: React.FC<NotificationItemProps> = ({ notification, onMar
 
   return (
     <div 
-      className={`p-4 border-b border-gray-100 transition-all duration-200 cursor-pointer ${getBgColor(notification.type, notification.is_read)}`}
-      onClick={() => !notification.is_read && onMarkAsRead(notification.id)}
+      className={`p-4 border-b border-gray-100 transition-all duration-200 ${getBgColor(notification.type, notification.is_read)}`}
     >
       <div className="flex items-start gap-3">
         <div className="flex-shrink-0 p-2 rounded-full bg-white shadow-sm">
@@ -85,19 +83,6 @@ const NotificationItem: React.FC<NotificationItemProps> = ({ notification, onMar
             )}
           </div>
         </div>
-        {!notification.is_read && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="p-1.5 h-7 w-7 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-full"
-            onClick={(e) => {
-              e.stopPropagation();
-              onMarkAsRead(notification.id);
-            }}
-          >
-            <Check className="w-4 h-4" />
-          </Button>
-        )}
       </div>
     </div>
   );
@@ -121,9 +106,6 @@ export const NotificationBell: React.FC = () => {
     }
   }, [isConnected, isRefreshing, refreshNotifications]);
 
-  const handleMarkAsRead = (notificationId: number) => {
-    markNotificationRead(notificationId);
-  };
 
   const handleMarkAllAsRead = async () => {
     try {
@@ -143,6 +125,14 @@ export const NotificationBell: React.FC = () => {
     } catch (error) {
       console.error('Erreur marquage toutes notifications:', error);
     }
+  };
+
+  const handleClose = () => {
+    if (unreadCount > 0) {
+      // Marquer toutes les notifications comme lues à la fermeture
+      handleMarkAllAsRead();
+    }
+    setIsOpen(false);
   };
 
   const handleRefresh = async () => {
@@ -176,7 +166,7 @@ export const NotificationBell: React.FC = () => {
           {/* Overlay pour fermer */}
           <div 
             className="fixed inset-0 z-40" 
-            onClick={() => setIsOpen(false)}
+            onClick={handleClose}
           />
           
           {/* Contenu du dropdown */}
@@ -204,20 +194,10 @@ export const NotificationBell: React.FC = () => {
                     <RefreshCw className={`w-3 h-3 mr-1 ${isRefreshing ? 'animate-spin' : ''}`} />
                     Actualiser
                   </Button>
-                  {unreadCount > 0 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleMarkAllAsRead}
-                      className="text-xs px-2 py-1 h-auto"
-                    >
-                      Tout marquer lu
-                    </Button>
-                  )}
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => setIsOpen(false)}
+                    onClick={handleClose}
                     className="p-1 h-6 w-6"
                   >
                     <X className="w-4 h-4" />
@@ -241,7 +221,6 @@ export const NotificationBell: React.FC = () => {
                   <NotificationItem
                     key={notification.id}
                     notification={notification}
-                    onMarkAsRead={handleMarkAsRead}
                   />
                 ))
               ) : (
