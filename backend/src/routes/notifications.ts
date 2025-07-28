@@ -33,26 +33,22 @@ export async function createNotification(
   data?: any
 ): Promise<void> {
   try {
-    // Utiliser le service Socket.io pour la notification temps réel
-    try {
-      const socketService = getSocketService();
-      await socketService.sendNotification(userId, {
-        type,
-        message,
-        data
-      });
-      console.log(`🔔 Notification temps réel envoyée pour user ${userId}: ${message}`);
-    } catch (socketError) {
-      console.log('⚠️ Service Socket.io non disponible, utilisation fallback DB');
-      // Fallback: sauvegarder en base sans temps réel
-      await pool.query(`
-        INSERT INTO notifications (user_id, type, message, data, is_read, created_at)
-        VALUES ($1, $2, $3, $4, false, CURRENT_TIMESTAMP)
-      `, [userId, type, message, JSON.stringify(data)]);
-      console.log(`✅ Notification DB créée pour user ${userId}: ${message}`);
-    }
-  } catch (error) {
-    console.error('Erreur création notification:', error);
+    // Utiliser le service Socket.io qui gère déjà la sauvegarde DB + temps réel
+    const socketService = getSocketService();
+    await socketService.sendNotification(userId, {
+      type,
+      message,
+      data
+    });
+    console.log(`🔔 Notification envoyée pour user ${userId}: ${message}`);
+  } catch (socketError) {
+    console.log('⚠️ Service Socket.io non disponible, utilisation fallback DB');
+    // Fallback: sauvegarder en base sans temps réel
+    await pool.query(`
+      INSERT INTO notifications (user_id, type, message, data, is_read, created_at)
+      VALUES ($1, $2, $3, $4, false, CURRENT_TIMESTAMP)
+    `, [userId, type, message, JSON.stringify(data)]);
+    console.log(`✅ Notification DB créée pour user ${userId}: ${message}`);
   }
 }
 
