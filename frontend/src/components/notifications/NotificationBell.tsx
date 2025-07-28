@@ -137,8 +137,13 @@ export const NotificationBell: React.FC = () => {
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await refreshNotifications();
-    setIsRefreshing(false);
+    try {
+      await refreshNotifications();
+    } catch (error) {
+      console.error('❌ Erreur lors de l\'actualisation:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   const recentNotifications = notifications.slice(0, 10);
@@ -189,10 +194,10 @@ export const NotificationBell: React.FC = () => {
                     size="sm"
                     onClick={handleRefresh}
                     disabled={isRefreshing}
-                    className="text-xs px-2 py-1 h-auto"
+                    className="text-xs px-2 py-1 h-auto hover:bg-blue-50 hover:text-blue-600"
                   >
-                    <RefreshCw className={`w-3 h-3 mr-1 ${isRefreshing ? 'animate-spin' : ''}`} />
-                    Actualiser
+                    <RefreshCw className={`w-3 h-3 mr-1 ${isRefreshing ? 'animate-spin text-blue-600' : ''}`} />
+                    {isRefreshing ? 'Actualisation...' : 'Actualiser'}
                   </Button>
                   <Button
                     variant="ghost"
