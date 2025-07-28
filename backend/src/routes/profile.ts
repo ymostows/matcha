@@ -4,6 +4,7 @@ import { ProfileModel } from '../models/Profile';
 import { UserModel } from '../models/User';
 import pool from '../config/database';
 import { createNotification, NotificationType } from './notifications';
+import { DistanceCalculator } from '../utils/distanceCalculator';
 
 const router = Router();
 
@@ -217,6 +218,38 @@ function validateProfileData(data: any): string[] {
       errors.push('Maximum 10 centres d\'intérêt');
     }
   }
+
+  // Validation stricte des coordonnées GPS si fournies
+  if (data.location_lat !== undefined || data.location_lng !== undefined) {
+    // Vérifier que les deux coordonnées sont fournies ensemble
+    if ((data.location_lat !== undefined && data.location_lng === undefined) ||
+        (data.location_lat === undefined && data.location_lng !== undefined)) {
+      errors.push('Les coordonnées GPS doivent être fournies ensemble (latitude et longitude)');
+    } else if (data.location_lat !== undefined && data.location_lng !== undefined) {
+      // Validation stricte avec le service DistanceCalculator
+      if (!DistanceCalculator.validateCoordinates(data.location_lat, data.location_lng)) {
+        errors.push('Coordonnées GPS invalides. Vérifiez que la latitude est entre -90 et 90, la longitude entre -180 et 180, et qu\'elles ne sont pas (0,0)');
+      }
+      
+      // Validation supplémentaire : vérifier que ce ne sont pas des coordonnées suspectes
+      if (data.location_lat === data.location_lng) {
+        errors.push('Coordonnées GPS suspectes (latitude et longitude identiques)');
+      }
+      
+      // Logs de debug pour tracer les coordonnées reçues
+      console.log(`📍 Coordonnées GPS reçues: ${data.location_lat}, ${data.location_lng}`);
+    }
+  }
+
+  // Validation des champs de ville
+  if (data.city !== undefined && typeof data.city !== 'string') {
+    errors.push('La ville doit être une chaîne de caractères');
+  }
+
+  if (data.public_city !== undefined && typeof data.public_city !== 'string') {
+    errors.push('La ville publique doit être une chaîne de caractères');
+  }
+
   
   return errors;
 }
@@ -244,6 +277,35 @@ function validateUserData(data: any): string[] {
   return errors;
 }
 
+// PUT /api/profile/location/update-public-city - Mettre à jour le nom de ville public
+router.put('/location/update-public-city', authenticateToken, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = (req as any).user.userId;
+    
+    const updatedProfile = await ProfileModel.updatePublicCity(userId);
+    
+    if (!updatedProfile) {
+      res.status(404).json({ 
+        success: false, 
+        message: 'Profil non trouvé ou coordonnées GPS manquantes' 
+      });
+      return;
+    }
+    
+    res.json({ 
+      success: true, 
+      message: 'Nom de ville public mis à jour avec succès', 
+      profile: updatedProfile 
+    });
+  } catch (error) {
+    console.error('Erreur mise à jour ville publique:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erreur serveur' 
+    });
+  }
+});
+
 // GET /api/profile/browse - Obtenir les profils suggérés
 router.get('/browse', authenticateToken, async (req: Request, res: Response): Promise<void> => {
   try {
@@ -253,7 +315,7 @@ router.get('/browse', authenticateToken, async (req: Request, res: Response): Pr
       sortOrder = 'asc',
       ageMin, 
       ageMax,
-      maxDistance = 50,
+      maxDistance = 500,
       minFameRating = 0,
       maxFameRating = 100,
       commonTags = []
@@ -299,7 +361,9 @@ router.get('/browse', authenticateToken, async (req: Request, res: Response): Pr
         u.id, u.id as user_id, u.username, u.first_name, u.last_name, u.last_seen,
         p.biography, p.age, p.gender, p.sexual_orientation, 
         COALESCE(p.interests, '{}') as interests,
-        p.location_lat, p.location_lng, p.city, p.fame_rating,
+        p.location_lat, p.location_lng, p.city, 
+        p.city as public_city,
+        p.fame_rating,
         (SELECT COUNT(*) FROM likes WHERE liked_id = u.id AND is_like = true) as likes_count,
         (
           CASE 
@@ -448,7 +512,39 @@ router.get('/browse', authenticateToken, async (req: Request, res: Response): Pr
 
     query += ` ${orderClause} LIMIT 50`;
 
+    // Logs de debug pour le développement
+    if (process.env.NODE_ENV === 'development') {
+      console.log('📊 Browse profiles debug:', {
+        currentUser: {
+          id: userId,
+          location: currentUserProfile.location_lat && currentUserProfile.location_lng ? 
+            `${currentUserProfile.location_lat}, ${currentUserProfile.location_lng}` : 'No GPS',
+          city: currentUserProfile.city
+        },
+        filters: {
+          sortBy, sortOrder, ageMin, ageMax, maxDistance, 
+          minFameRating, maxFameRating, commonTags
+        },
+        sqlParams: {
+          userInterests: userInterests,
+          userCoordinates: `${currentUserProfile.location_lat}, ${currentUserProfile.location_lng}`,
+          parametersCount: params.length
+        }
+      });
+    }
+
     const result = await pool.query(query, params);
+    
+    // Logs des résultats pour debug
+    if (process.env.NODE_ENV === 'development') {
+      const profilesWithDistance = result.rows.filter(p => p.distance_km && p.distance_km < 999999);
+      console.log(`📍 Distance calculations: ${profilesWithDistance.length}/${result.rows.length} profiles with valid distances`);
+      
+      if (profilesWithDistance.length > 0) {
+        const distances = profilesWithDistance.map(p => p.distance_km).sort((a, b) => a - b);
+        console.log(`📏 Distance range: ${distances[0]}km - ${distances[distances.length - 1]}km`);
+      }
+    }
     
     res.json({
       success: true,
@@ -664,8 +760,18 @@ router.get('/:userId', authenticateToken, async (req: Request, res: Response): P
       return;
     }
 
-    // Obtenir le profil complet
-    const profile = await ProfileModel.findCompleteProfile(targetUserId);
+    // Récupérer les coordonnées de l'utilisateur visiteur pour calculer la distance
+    const visitorProfile = await ProfileModel.findByUserId(visitorId);
+    let visitorCoordinates = undefined;
+    if (visitorProfile && visitorProfile.location_lat && visitorProfile.location_lng) {
+      visitorCoordinates = {
+        latitude: parseFloat(visitorProfile.location_lat),
+        longitude: parseFloat(visitorProfile.location_lng)
+      };
+    }
+
+    // Obtenir le profil complet avec calcul de distance
+    const profile = await ProfileModel.findCompleteProfile(targetUserId, visitorCoordinates);
     
     if (!profile) {
       res.status(404).json({ 
@@ -709,13 +815,14 @@ router.get('/:userId', authenticateToken, async (req: Request, res: Response): P
     }
 
     // Créer une notification pour la visite (seulement si c'est une nouvelle visite)
-    if (isNewVisit) {
-      const visitorProfile = await ProfileModel.findCompleteProfile(visitorId);
+    if (isNewVisit && visitorProfile) {
+      // Récupérer les informations complètes du visiteur pour la notification
+      const visitorFullProfile = await ProfileModel.findCompleteProfile(visitorId);
       await createNotification(
         targetUserId,
         NotificationType.VISIT,
-        `👁️ ${visitorProfile?.first_name} a visité votre profil`,
-        { userId: visitorId, profileName: visitorProfile?.first_name }
+        `👁️ ${visitorFullProfile?.first_name} a visité votre profil`,
+        { userId: visitorId, profileName: visitorFullProfile?.first_name }
       );
     }
     
@@ -773,6 +880,21 @@ router.post('/like', authenticateToken, async (req: Request, res: Response): Pro
     const client = await pool.connect();
     let isMatch = false;
     try {
+      // Vérifier s'il existe déjà un match entre les deux utilisateurs
+      const existingMatchResult = await client.query(`
+        SELECT 1 FROM matches 
+        WHERE (user1_id = $1 AND user2_id = $2) OR (user1_id = $2 AND user2_id = $1)
+      `, [Math.min(userId, targetUserId), Math.max(userId, targetUserId)]);
+
+      if (existingMatchResult.rows.length > 0 && isLike) {
+        client.release();
+        res.status(400).json({ 
+          success: false, 
+          message: 'Vous êtes déjà en match avec cette personne. Utilisez la messagerie pour communiquer.' 
+        });
+        return;
+      }
+
       // Insérer ou mettre à jour le like
       await client.query(`
         INSERT INTO likes (liker_id, liked_id, is_like)
@@ -987,9 +1109,16 @@ router.delete('/like/:userId', authenticateToken, async (req: Request, res: Resp
       client.release();
     }
 
-    // Créer une notification d'unlike si il y avait un match
+    // Créer une notification d'unlike (différente selon s'il y avait un match ou pas)
+    const userProfile = await ProfileModel.findCompleteProfile(userId);
     if (hadMatch) {
-      const userProfile = await ProfileModel.findCompleteProfile(userId);
+      await createNotification(
+        targetUserId,
+        NotificationType.UNLIKE,
+        `💔 ${userProfile?.first_name} a annulé votre match`,
+        { userId: userId, profileName: userProfile?.first_name }
+      );
+    } else {
       await createNotification(
         targetUserId,
         NotificationType.UNLIKE,
@@ -1217,5 +1346,187 @@ async function updateFameRating(userId: number, client: any): Promise<void> {
   }
 }
 
+
+// Route de debug pour tester les calculs de distance (uniquement en développement)
+if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
+  router.get('/debug/distance', authenticateToken, async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = (req as any).user.userId;
+      const { targetLat, targetLng, debugMode = 'false' } = req.query;
+      
+      // Obtenir le profil de l'utilisateur actuel
+      const currentUserProfile = await ProfileModel.findByUserId(userId);
+      if (!currentUserProfile) {
+        res.status(400).json({ 
+          success: false, 
+          message: 'Profil utilisateur non trouvé' 
+        });
+        return;
+      }
+
+      const debugInfo: any = {
+        currentUser: {
+          id: userId,
+          coordinates: {
+            latitude: currentUserProfile.location_lat,
+            longitude: currentUserProfile.location_lng
+          },
+          city: currentUserProfile.city,
+          coordinatesValid: DistanceCalculator.validateCoordinates(
+            currentUserProfile.location_lat || 0, 
+            currentUserProfile.location_lng || 0
+          )
+        }
+      };
+
+      // Si des coordonnées cibles sont fournies, calculer la distance
+      if (targetLat && targetLng) {
+        const targetLatNum = parseFloat(targetLat as string);
+        const targetLngNum = parseFloat(targetLng as string);
+        
+        debugInfo.target = {
+          coordinates: { latitude: targetLatNum, longitude: targetLngNum },
+          coordinatesValid: DistanceCalculator.validateCoordinates(targetLatNum, targetLngNum)
+        };
+
+        if (currentUserProfile.location_lat && currentUserProfile.location_lng && 
+            DistanceCalculator.validateCoordinates(currentUserProfile.location_lat, currentUserProfile.location_lng) &&
+            DistanceCalculator.validateCoordinates(targetLatNum, targetLngNum)) {
+          
+          try {
+            const distance = DistanceCalculator.calculateDistance(
+              { latitude: currentUserProfile.location_lat, longitude: currentUserProfile.location_lng },
+              { latitude: targetLatNum, longitude: targetLngNum }
+            );
+            
+            debugInfo.calculation = {
+              distance_km: distance,
+              method: 'DistanceCalculator.calculateDistance'
+            };
+          } catch (error) {
+            debugInfo.calculation = {
+              error: error instanceof Error ? error.message : 'Erreur inconnue'
+            };
+          }
+          
+          // Comparer avec le calcul SQL
+          try {
+            const sqlResult = await pool.query(`
+              SELECT ${DistanceCalculator.getSQLDistanceFormula('$1', '$2', '$3::numeric', '$4::numeric')} AS sql_distance_km
+            `, [currentUserProfile.location_lat, currentUserProfile.location_lng, targetLatNum, targetLngNum]);
+            
+            debugInfo.sqlCalculation = {
+              distance_km: sqlResult.rows[0]?.sql_distance_km,
+              method: 'SQL Haversine formula'
+            };
+          } catch (error) {
+            debugInfo.sqlCalculation = {
+              error: error instanceof Error ? error.message : 'Erreur SQL inconnue'
+            };
+          }
+        }
+      } else {
+        // Trouver les 5 profils les plus proches pour debug
+        try {
+          const nearbyProfiles = await pool.query(`
+            SELECT 
+              u.id, u.first_name, u.last_name, p.city,
+              p.location_lat, p.location_lng,
+              ${DistanceCalculator.getSQLDistanceFormula('$1', '$2', 'p.location_lat', 'p.location_lng')} AS distance_km
+            FROM users u
+            JOIN profiles p ON u.id = p.user_id
+            WHERE u.id != $3 
+              AND p.location_lat IS NOT NULL 
+              AND p.location_lng IS NOT NULL
+              AND p.location_lat != 0 
+              AND p.location_lng != 0
+            ORDER BY distance_km ASC
+            LIMIT 5
+          `, [currentUserProfile.location_lat, currentUserProfile.location_lng, userId]);
+          
+          debugInfo.nearbyProfiles = nearbyProfiles.rows;
+        } catch (error) {
+          debugInfo.nearbyProfilesError = error instanceof Error ? error.message : 'Erreur inconnue';
+        }
+      }
+
+      // Logs détaillés si demandé
+      if (debugMode === 'true') {
+        console.log('🔍 Debug calcul de distance:', JSON.stringify(debugInfo, null, 2));
+      }
+      
+      res.json({
+        success: true,
+        debug: debugInfo,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Erreur route debug distance:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: 'Erreur serveur lors du debug' 
+      });
+    }
+  });
+
+  // Route pour valider les coordonnées de tous les profils existants
+  router.get('/debug/validate-coordinates', authenticateToken, async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { fix = 'false' } = req.query;
+      
+      const profiles = await pool.query(`
+        SELECT id, user_id, city, location_lat, location_lng, public_city
+        FROM profiles 
+        WHERE location_lat IS NOT NULL AND location_lng IS NOT NULL
+      `);
+      
+      const results = {
+        total: profiles.rows.length,
+        valid: 0,
+        invalid: 0,
+        suspicious: 0,
+        details: [] as any[]
+      };
+      
+      for (const profile of profiles.rows) {
+        const isValid = DistanceCalculator.validateCoordinates(profile.location_lat, profile.location_lng);
+        const isSuspicious = profile.location_lat === profile.location_lng || 
+                            (profile.location_lat === 0 && profile.location_lng === 0);
+        
+        if (isValid && !isSuspicious) {
+          results.valid++;
+        } else if (!isValid) {
+          results.invalid++;
+          results.details.push({
+            user_id: profile.user_id,
+            city: profile.city,
+            coordinates: [profile.location_lat, profile.location_lng],
+            reason: 'Invalid coordinates'
+          });
+        } else if (isSuspicious) {
+          results.suspicious++;
+          results.details.push({
+            user_id: profile.user_id,
+            city: profile.city,
+            coordinates: [profile.location_lat, profile.location_lng],
+            reason: 'Suspicious coordinates (same lat/lng or 0,0)'
+          });
+        }
+      }
+      
+      res.json({
+        success: true,
+        validation: results,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Erreur validation coordonnées:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: 'Erreur serveur lors de la validation' 
+      });
+    }
+  });
+}
 
 export default router; 

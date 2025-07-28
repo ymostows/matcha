@@ -61,7 +61,14 @@ const ProfileCard: React.FC<{
               </h3>
               <div className="flex items-center text-sm text-white/90 drop-shadow-md">
                 <MapPin className="w-4 h-4 mr-1 flex-shrink-0" />
-                <span className="overflow-hidden text-ellipsis whitespace-nowrap">{profile.city || 'Non spécifié'}</span>
+                <span className="overflow-hidden text-ellipsis whitespace-nowrap">
+                  {profile.city || 'Non spécifié'}
+                  {profile.distance_km !== undefined && profile.distance_km !== null && (
+                    <span className="ml-1 text-xs opacity-80">
+                      • {profile.distance_km < 1 ? '<1' : Math.round(profile.distance_km)} km
+                    </span>
+                  )}
+                </span>
               </div>
             </div>
             {profile.interests && profile.interests.length > 0 && (
@@ -150,7 +157,7 @@ const BrowsingPage: React.FC = () => {
   const [sortBy, setSortBy] = useState<'distance' | 'age' | 'fame_rating' | 'common_tags' | 'intelligent'>('intelligent');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [ageRange, setAgeRange] = useState<[number, number]>([18, 65]);
-  const [maxDistance, setMaxDistance] = useState<number>(50);
+  const [maxDistance, setMaxDistance] = useState<number>(1000);
   const [fameRange, setFameRange] = useState<[number, number]>([0, 100]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
@@ -186,6 +193,22 @@ const BrowsingPage: React.FC = () => {
       setIsLoading(false);
     }
   };
+
+  // Ajuster automatiquement l'ordre de tri selon le type de tri
+  useEffect(() => {
+    if (sortBy === 'common_tags' || sortBy === 'fame_rating') {
+      // Pour les intérêts communs et la popularité, on veut les plus élevés en premier
+      if (sortOrder === 'asc') {
+        setSortOrder('desc');
+      }
+    } else if (sortBy === 'distance' || sortBy === 'age') {
+      // Pour la distance et l'âge, on veut les plus faibles en premier
+      if (sortOrder === 'desc') {
+        setSortOrder('asc');
+      }
+    }
+    // Pour le tri intelligent, on garde l'ordre actuel (il a sa propre logique)
+  }, [sortBy]);
 
   useEffect(() => {
     fetchProfiles();
@@ -225,10 +248,14 @@ const BrowsingPage: React.FC = () => {
             closeDialog();
           }
         });
+      } else if (errorMessage.includes('match')) {
+        warning('Vous êtes déjà en match avec cette personne ! Consultez vos matches. 💕');
+        // Retirer le profil de la liste car on ne peut plus l'interagir
+        setProfiles(prev => prev.filter(p => p.user_id !== userId));
       } else {
         errorToast(errorMessage);
       }
-      // Ne pas retirer le profil de la liste en cas d'erreur
+      // Ne pas retirer le profil de la liste en cas d'erreur (sauf pour les matches)
     } finally {
       setLoadingActions(prev => {
         const newSet = new Set(prev);
@@ -244,7 +271,7 @@ const BrowsingPage: React.FC = () => {
       setLoadingActions(prev => new Set(prev).add(userId));
       const result = await profileApi.unlikeProfile(userId);
       if (result.hadMatch) {
-        warning('💔 Le match a été supprimé et le chat désactivé.');
+        warning('💔 Le match a été annulé et le chat désactivé.');
       }
       // Retirer le profil de la liste SEULEMENT si l'unlike a réussi
       setProfiles(prev => prev.filter(p => p.user_id !== userId));
@@ -362,8 +389,8 @@ const BrowsingPage: React.FC = () => {
                   value={[maxDistance]}
                   onValueChange={(value) => setMaxDistance(value[0])}
                   min={1}
-                  max={200}
-                  step={1}
+                  max={1000}
+                  step={10}
                   className="mt-2"
                 />
               </div>

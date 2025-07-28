@@ -1,6 +1,8 @@
 import pool from '../config/database';
 import { Profile, CreateProfileData } from '../types/user';
 import { QueryResult } from 'pg';
+import { GeocodingService } from '../utils/geocoding';
+import { DistanceCalculator, Coordinates } from '../utils/distanceCalculator';
 
 export class ProfileModel {
   
@@ -9,6 +11,20 @@ export class ProfileModel {
     const client = await pool.connect();
     
     try {
+      // Générer public_city si on a des coordonnées GPS et pas de public_city
+      let publicCity = profileData.public_city;
+      if (!publicCity && profileData.location_lat && profileData.location_lng) {
+        try {
+          publicCity = await GeocodingService.getPublicCityName({
+            latitude: profileData.location_lat,
+            longitude: profileData.location_lng
+          });
+        } catch (error) {
+          console.warn('Échec du géocodage lors de la création du profil:', error);
+          publicCity = profileData.city || 'Localisation non disponible';
+        }
+      }
+
       // Vérifier si le profil existe déjà
       const existingProfile = await client.query(
         'SELECT id FROM profiles WHERE user_id = $1',
@@ -23,7 +39,9 @@ export class ProfileModel {
         query = `
           UPDATE profiles 
           SET biography = $2, age = $3, gender = $4, sexual_orientation = $5, 
-              interests = $6, city = $7, isComplete = $8, updated_at = CURRENT_TIMESTAMP
+              interests = $6, city = $7, location_lat = $8, location_lng = $9,
+              public_city = $10, isComplete = $11, 
+              updated_at = CURRENT_TIMESTAMP
           WHERE user_id = $1
           RETURNING *
         `;
@@ -35,13 +53,17 @@ export class ProfileModel {
           profileData.sexual_orientation,
           profileData.interests,
           profileData.city,
+          profileData.location_lat,
+          profileData.location_lng,
+          publicCity,
           (profileData as any).isComplete || false
         ];
       } else {
         // Création
         query = `
-          INSERT INTO profiles (user_id, biography, age, gender, sexual_orientation, interests, city, isComplete)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          INSERT INTO profiles (user_id, biography, age, gender, sexual_orientation, interests, city, 
+                               location_lat, location_lng, public_city, isComplete)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
           RETURNING *
         `;
         values = [
@@ -52,6 +74,9 @@ export class ProfileModel {
           profileData.sexual_orientation,
           profileData.interests,
           profileData.city,
+          profileData.location_lat,
+          profileData.location_lng,
+          publicCity,
           (profileData as any).isComplete || false
         ];
       }
@@ -84,29 +109,61 @@ export class ProfileModel {
   }
   
   // Obtenir un profil complet avec informations utilisateur et photos
-  static async findCompleteProfile(userId: number): Promise<any> {
+  static async findCompleteProfile(
+    userId: number, 
+    currentUserCoordinates?: Coordinates
+  ): Promise<any> {
     const client = await pool.connect();
     
     try {
-      // D'abord récupérer le profil de base
-      const profileQuery = `
-        SELECT 
-          u.id, u.username, u.first_name, u.last_name, u.email, u.last_seen,
-          p.id as profile_id, p.user_id, p.biography, p.age, p.gender, p.sexual_orientation, 
-          p.interests, p.location_lat, p.location_lng, p.city, p.fame_rating, p.isComplete,
-          p.created_at, p.updated_at
-        FROM users u
-        LEFT JOIN profiles p ON u.id = p.user_id
-        WHERE u.id = $1
-      `;
+      let profileQuery: string;
+      let queryParams: any[];
+
+      if (currentUserCoordinates && 
+          DistanceCalculator.validateCoordinates(currentUserCoordinates.latitude, currentUserCoordinates.longitude)) {
+        // Inclure le calcul de distance si des coordonnées valides sont fournies
+        profileQuery = `
+          SELECT 
+            u.id, u.username, u.first_name, u.last_name, u.email, u.last_seen,
+            p.id as profile_id, p.user_id, p.biography, p.age, p.gender, p.sexual_orientation, 
+            p.interests, p.location_lat, p.location_lng, p.city, p.public_city,
+            p.fame_rating, p.isComplete, p.created_at, p.updated_at,
+            ${DistanceCalculator.getSQLDistanceFormula('$2', '$3', 'p.location_lat', 'p.location_lng')} AS distance_km
+          FROM users u
+          LEFT JOIN profiles p ON u.id = p.user_id
+          WHERE u.id = $1
+        `;
+        queryParams = [userId, currentUserCoordinates.latitude, currentUserCoordinates.longitude];
+      } else {
+        // Requête sans calcul de distance
+        profileQuery = `
+          SELECT 
+            u.id, u.username, u.first_name, u.last_name, u.email, u.last_seen,
+            p.id as profile_id, p.user_id, p.biography, p.age, p.gender, p.sexual_orientation, 
+            p.interests, p.location_lat, p.location_lng, p.city, p.public_city,
+            p.fame_rating, p.isComplete, p.created_at, p.updated_at,
+            NULL as distance_km
+          FROM users u
+          LEFT JOIN profiles p ON u.id = p.user_id
+          WHERE u.id = $1
+        `;
+        queryParams = [userId];
+      }
       
-      const profileResult = await client.query(profileQuery, [userId]);
+      const profileResult = await client.query(profileQuery, queryParams);
       
       if (profileResult.rows.length === 0) {
         return null;
       }
       
       const profile = profileResult.rows[0];
+      
+      // Conversion du distance_km si c'est un nombre valide
+      if (profile.distance_km !== null && profile.distance_km !== undefined && !isNaN(profile.distance_km)) {
+        profile.distance_km = Math.round(profile.distance_km * 100) / 100; // Arrondir à 2 décimales
+      } else if (profile.distance_km === 999999) {
+        profile.distance_km = null; // Valeur par défaut signifiant "pas de distance calculable"
+      }
       
       // Ensuite récupérer les photos séparément
       const photosQuery = `
@@ -141,6 +198,45 @@ export class ProfileModel {
       `;
       
       const result: QueryResult<Profile> = await client.query(query, [userId]);
+      
+      return result.rows[0] || null;
+    } finally {
+      client.release();
+    }
+  }
+
+  // Mettre à jour public_city basé sur les coordonnées GPS
+  static async updatePublicCity(userId: number): Promise<Profile | null> {
+    const client = await pool.connect();
+    
+    try {
+      // Récupérer le profil actuel
+      const currentProfile = await this.findByUserId(userId);
+      if (!currentProfile || !currentProfile.location_lat || !currentProfile.location_lng) {
+        return currentProfile;
+      }
+
+      // Générer le nom de ville public
+      let publicCity: string;
+      try {
+        publicCity = await GeocodingService.getPublicCityName({
+          latitude: currentProfile.location_lat,
+          longitude: currentProfile.location_lng
+        });
+      } catch (error) {
+        console.warn('Échec du géocodage lors de la mise à jour:', error);
+        publicCity = currentProfile.city || 'Localisation non disponible';
+      }
+
+      // Mettre à jour le profil
+      const query = `
+        UPDATE profiles 
+        SET public_city = $2, updated_at = CURRENT_TIMESTAMP
+        WHERE user_id = $1
+        RETURNING *
+      `;
+      
+      const result: QueryResult<Profile> = await client.query(query, [userId, publicCity]);
       
       return result.rows[0] || null;
     } finally {

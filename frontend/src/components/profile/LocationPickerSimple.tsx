@@ -3,14 +3,21 @@ import { motion } from 'framer-motion';
 import { MapPin, Navigation, Globe, Loader2 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
+import { Label } from '../ui/label';
 
 interface LocationPickerSimpleProps {
   initialLocation?: {
     latitude?: number;
     longitude?: number;
     city?: string;
+    publicCity?: string;
   };
-  onLocationChange: (location: { latitude: number | null; longitude: number | null; city: string }) => void;
+  onLocationChange: (location: { 
+    latitude: number | null; 
+    longitude: number | null; 
+    city: string;
+    publicCity?: string;
+  }) => void;
   className?: string;
 }
 
@@ -18,7 +25,10 @@ interface LocationData {
   latitude: number;
   longitude: number;
   city: string;
+  publicCity?: string;
   method: 'gps' | 'ip' | 'manual';
+  precision: 'high' | 'medium' | 'low';
+  accuracy?: string; // Description textuelle de la précision
 }
 
 export const LocationPickerSimple: React.FC<LocationPickerSimpleProps> = ({
@@ -31,7 +41,10 @@ export const LocationPickerSimple: React.FC<LocationPickerSimpleProps> = ({
       latitude: initialLocation.latitude,
       longitude: initialLocation.longitude,
       city: initialLocation.city || '',
-      method: 'manual'
+      publicCity: initialLocation.publicCity,
+      method: 'manual',
+      precision: 'medium',
+      accuracy: 'Localisation précédente'
     } : null
   );
   const [manualCity, setManualCity] = useState(initialLocation?.city || '');
@@ -41,11 +54,21 @@ export const LocationPickerSimple: React.FC<LocationPickerSimpleProps> = ({
 
   useEffect(() => {
     if (location) {
-      setStatus(`Localisation définie : ${location.city}`);
-      onLocationChange(location);
+      const displayCity = location.publicCity || location.city;
+      setStatus(`Localisation définie : ${displayCity}`);
+      onLocationChange({
+        latitude: location.latitude,
+        longitude: location.longitude,
+        city: location.city,
+        publicCity: location.publicCity
+      });
     } else if (manualCity) {
       setStatus(`Localisation définie : ${manualCity}`);
-      onLocationChange({ latitude: null, longitude: null, city: manualCity });
+      onLocationChange({ 
+        latitude: null, 
+        longitude: null, 
+        city: manualCity
+      });
     } else {
       setStatus('Choisissez une méthode pour définir votre localisation.');
     }
@@ -66,16 +89,57 @@ export const LocationPickerSimple: React.FC<LocationPickerSimpleProps> = ({
     setError(null);
 
     navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
+      async (position) => {
+        const { latitude, longitude, accuracy } = position.coords;
+        
+        // Déterminer la précision basée sur l'accuracy GPS
+        let precision: 'high' | 'medium' | 'low' = 'medium';
+        let accuracyDescription = '';
+        
+        if (accuracy <= 10) {
+          precision = 'high';
+          accuracyDescription = `Très précise (±${Math.round(accuracy)}m)`;
+        } else if (accuracy <= 100) {
+          precision = 'medium';
+          accuracyDescription = `Précise (±${Math.round(accuracy)}m)`;
+        } else {
+          precision = 'low';
+          accuracyDescription = `Approximative (±${Math.round(accuracy)}m)`;
+        }
+        
+        // Essayer de géocoder les coordonnées pour obtenir un nom de ville
+        let cityName = `Position GPS (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`;
+        let publicCity = `Localisation précise`;
+        
+        try {
+          // Utiliser l'API de géocodage inversé gratuite
+          const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10`);
+          const data = await response.json();
+          
+          if (data.address) {
+            const address = data.address;
+            const city = address.city || address.town || address.village || address.municipality;
+            const country = address.country;
+            
+            if (city && country) {
+              cityName = `${city}, ${country}`;
+              publicCity = `${city}, ${country}`;
+            }
+          }
+        } catch (error) {
+          console.warn('Géocodage GPS échoué:', error);
+        }
         
         setLocation({
           latitude,
           longitude,
-          city: `Position GPS (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`,
-          method: 'gps'
+          city: cityName,
+          publicCity,
+          method: 'gps',
+          precision,
+          accuracy: accuracyDescription
         });
-        setManualCity(`Position GPS (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`);
+        setManualCity(cityName);
         setIsDetecting(false);
       },
       (error) => {
@@ -113,13 +177,17 @@ export const LocationPickerSimple: React.FC<LocationPickerSimpleProps> = ({
         const response = await fetch('https://ipapi.co/json/');
         data = await response.json();
         if (data.latitude && data.longitude) {
+          const cityName = `${data.city}, ${data.country_name}`;
           setLocation({
             latitude: data.latitude,
             longitude: data.longitude,
-            city: `${data.city}, ${data.country_name}`,
-            method: 'ip'
+            city: cityName,
+            publicCity: `Près de ${data.city}, ${data.country_name}`,
+            method: 'ip',
+            precision: 'low',
+            accuracy: 'Basée sur votre adresse IP (~5-10km)'
           });
-          setManualCity(`${data.city}, ${data.country_name}`);
+          setManualCity(cityName);
           setIsDetecting(false);
           return;
         }
@@ -132,13 +200,17 @@ export const LocationPickerSimple: React.FC<LocationPickerSimpleProps> = ({
         const response = await fetch('http://ip-api.com/json/');
         data = await response.json();
         if (data.status === 'success' && data.lat && data.lon) {
+          const cityName = `${data.city}, ${data.country}`;
           setLocation({
             latitude: data.lat,
             longitude: data.lon,
-            city: `${data.city}, ${data.country}`,
-            method: 'ip'
+            city: cityName,
+            publicCity: `Près de ${data.city}, ${data.country}`,
+            method: 'ip',
+            precision: 'low',
+            accuracy: 'Basée sur votre adresse IP (~5-10km)'
           });
-          setManualCity(`${data.city}, ${data.country}`);
+          setManualCity(cityName);
           setIsDetecting(false);
           return;
         }
@@ -154,13 +226,17 @@ export const LocationPickerSimple: React.FC<LocationPickerSimpleProps> = ({
         const geoData = await geoResponse.json();
         
         if (geoData.latitude && geoData.longitude) {
+          const cityName = `${geoData.city}, ${geoData.country_name}`;
           setLocation({
             latitude: geoData.latitude,
             longitude: geoData.longitude,
-            city: `${geoData.city}, ${geoData.country_name}`,
-            method: 'ip'
+            city: cityName,
+            publicCity: `Près de ${geoData.city}, ${geoData.country_name}`,
+            method: 'ip',
+            precision: 'low',
+            accuracy: 'Basée sur votre adresse IP (~5-10km)'
           });
-          setManualCity(`${geoData.city}, ${geoData.country_name}`);
+          setManualCity(cityName);
           setIsDetecting(false);
           return;
         }
@@ -182,6 +258,20 @@ export const LocationPickerSimple: React.FC<LocationPickerSimpleProps> = ({
     setManualCity(city);
     setLocation(null); // Reset coordinates
     setError(null);
+    
+    // Créer une nouvelle localisation manuelle si l'utilisateur a saisi une ville
+    if (city.trim()) {
+      // Pas de coordonnées GPS pour une saisie manuelle
+      setLocation({
+        latitude: 0, // Valeurs temporaires, ne seront pas utilisées
+        longitude: 0,
+        city: city.trim(),
+        publicCity: city.trim(),
+        method: 'manual',
+        precision: 'low',
+        accuracy: 'Saisie manuelle (pas de coordonnées GPS)'
+      });
+    }
   };
 
 
@@ -198,11 +288,38 @@ export const LocationPickerSimple: React.FC<LocationPickerSimpleProps> = ({
         <p className="text-twilight/60">Aidez-nous à vous proposer des rencontres près de chez vous</p>
       </div>
 
-      {/* Affichage du statut actuel */}
+      {/* Affichage du statut actuel avec feedback de précision */}
       <div className="text-center p-4 bg-gray-50 rounded-lg border">
-        <p className="font-medium text-gray-800">{status}</p>
-        {location && <p className="text-sm text-gray-500 capitalize">Méthode : {location.method}</p>}
+        <p className="font-medium text-gray-800 mb-2">{status}</p>
+        {location && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-center gap-2">
+              <span className="text-sm text-gray-600 capitalize">Méthode : {location.method}</span>
+              <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                location.precision === 'high' 
+                  ? 'bg-green-100 text-green-800'
+                  : location.precision === 'medium'
+                  ? 'bg-yellow-100 text-yellow-800'
+                  : 'bg-orange-100 text-orange-800'
+              }`}>
+                <div className={`w-2 h-2 rounded-full ${
+                  location.precision === 'high' 
+                    ? 'bg-green-500'
+                    : location.precision === 'medium'
+                    ? 'bg-yellow-500'
+                    : 'bg-orange-500'
+                }`} />
+                {location.precision === 'high' ? 'Très précise' : 
+                 location.precision === 'medium' ? 'Précise' : 'Approximative'}
+              </div>
+            </div>
+            {location.accuracy && (
+              <p className="text-xs text-gray-500">{location.accuracy}</p>
+            )}
+          </div>
+        )}
       </div>
+
       
       {/* Erreur */}
       {error && (

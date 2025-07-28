@@ -116,22 +116,23 @@ export const ProfilePublicPage: React.FC = () => {
       const userIdNumber = parseInt(userId!);
       if (isNaN(userIdNumber)) return;
 
-      // Pour éviter les erreurs 400, on utilise une approche plus simple
-      // On va essayer de récupérer seulement l'historique des likes
-      // et éviter d'appeler getLikedProfiles qui cause l'erreur 400
+      // Vérifier d'abord si on a un match avec cet utilisateur
       try {
+        const matchesResponse = await profileApi.getMatches(100, 0);
+        const isMatched = matchesResponse.matches.some(match => match.user_id === userIdNumber);
+
+        // Récupérer l'historique des likes
         const likesHistory = await profileApi.getLikesHistory(100);
         const hasLikedMe = likesHistory.some(like => like.liker_id === userIdNumber);
 
-        // Pour vérifier si on a liké cet utilisateur, on initialise à false
-        // Cette information sera mise à jour quand l'utilisateur effectue une action
+        // Si on a un match, on considère qu'on s'est likés mutuellement
         setLikeStatus({
-          isLiked: false,
-          isMatched: false,
+          isLiked: isMatched, // Si match, alors on s'est forcément likés
+          isMatched,
           hasLikedMe
         });
       } catch (likesError) {
-        // Si même l'historique des likes échoue, on utilise des valeurs par défaut
+        // Si ça échoue, on utilise des valeurs par défaut
         setLikeStatus({
           isLiked: false,
           isMatched: false,
@@ -139,8 +140,7 @@ export const ProfilePublicPage: React.FC = () => {
         });
       }
     } catch (err: any) {
-      // Ne pas logger l'erreur en console pour éviter les messages d'erreur
-      // Juste initialiser avec des valeurs par défaut
+      // Initialiser avec des valeurs par défaut
       setLikeStatus({
         isLiked: false,
         isMatched: false,
@@ -190,11 +190,15 @@ export const ProfilePublicPage: React.FC = () => {
       setIsActionLoading(true);
       const userIdNumber = parseInt(userId);
       
-      if (likeStatus.isLiked) {
-        // Unlike
+      if (likeStatus.isLiked || likeStatus.isMatched) {
+        // Unlike/Annuler match
+        const wasMatched = likeStatus.isMatched;
         const result = await profileApi.unlikeProfile(userIdNumber);
-        if (result.hadMatch) {
-          warning('💔 Le match a été supprimé et le chat désactivé.');
+        
+        if (result.hadMatch || wasMatched) {
+          warning('💔 Le match a été annulé et le chat désactivé.');
+        } else {
+          success('Like retiré avec succès.');
         }
         setLikeStatus(prev => ({ ...prev, isLiked: false, isMatched: false }));
       } else {
@@ -228,6 +232,10 @@ export const ProfilePublicPage: React.FC = () => {
             closeDialog();
           }
         });
+      } else if (errorMessage.includes('match')) {
+        // Si l'erreur indique qu'on est déjà en match, on met à jour le state
+        setLikeStatus(prev => ({ ...prev, isLiked: true, isMatched: true }));
+        warning('Vous êtes déjà en match avec cette personne ! 💕');
       } else {
         errorToast(errorMessage);
       }
@@ -453,7 +461,14 @@ export const ProfilePublicPage: React.FC = () => {
                       </div>
                       <div className="flex items-center gap-2">
                         <MapPin className="w-4 h-4" />
-                        <span>{profile.city || 'Non spécifié'}</span>
+                        <span>
+                          {profile.city || 'Non spécifié'}
+                          {profile.distance_km !== undefined && profile.distance_km !== null && (
+                            <span className="ml-1 text-xs text-twilight/60">
+                              • {profile.distance_km < 1 ? '<1' : Math.round(profile.distance_km)} km
+                            </span>
+                          )}
+                        </span>
                       </div>
                       <div className="flex items-center gap-2">
                         <div className={`w-2 h-2 rounded-full ${isUserOnline(profile.last_seen) ? 'bg-green-500' : 'bg-gray-400'}`} />
@@ -599,18 +614,18 @@ export const ProfilePublicPage: React.FC = () => {
                 {/* Bouton principal - Like/Unlike */}
                 <div className="flex flex-col gap-3 w-full max-w-sm mx-auto">
                   <Button 
-                    className={`w-full py-4 sm:py-3 text-base sm:text-sm ${likeStatus.isLiked ? 'bg-red-500 hover:bg-red-600' : 'bg-pink-500 hover:bg-pink-600'}`}
+                    className={`w-full py-4 sm:py-3 text-base sm:text-sm ${(likeStatus.isLiked || likeStatus.isMatched) ? 'bg-red-500 hover:bg-red-600' : 'bg-pink-500 hover:bg-pink-600'}`}
                     onClick={handleLike}
                     disabled={isActionLoading}
                   >
                     {isActionLoading ? (
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : likeStatus.isLiked ? (
+                    ) : (likeStatus.isLiked || likeStatus.isMatched) ? (
                       <X className="w-4 h-4 mr-2" />
                     ) : (
                       <Heart className="w-4 h-4 mr-2" />
                     )}
-                    {likeStatus.isLiked ? 'Retirer le like' : 'Liker le profil'}
+                    {likeStatus.isMatched ? 'Annuler le match' : likeStatus.isLiked ? 'Retirer le like' : 'Liker le profil'}
                   </Button>
                   
                   {likeStatus.isMatched && (
