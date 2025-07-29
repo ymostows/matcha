@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Loader2, ServerCrash, Heart, MapPin, Search, X, Filter, SortAsc, SortDesc, User } from 'lucide-react';
+import { Loader2, ServerCrash, Heart, MapPin, Search, X, Filter, SortAsc, SortDesc, User, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
+import { Input } from '@/components/ui/input';
 import { profileApi, CompleteProfile } from '@/services/profileApi';
 import { getPhotoUrl as getStandardPhotoUrl } from '@/utils/imageUtils';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useToast } from '@/hooks/useToast';
 import { useDialog } from '@/hooks/useDialog';
 import { ConfirmDialog, MatchDialog } from '@/components/ui/dialog';
@@ -56,7 +57,9 @@ const ProfileCard: React.FC<{
           <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4">
           <div className="flex items-end justify-between">
             <div className="flex-1 min-w-0 max-w-[60%]">
-              <h3 className="text-lg font-bold cursor-pointer text-white drop-shadow-lg" onClick={() => navigate(`/profile/${profile.user_id}`)}>
+              <h3 className="text-lg font-bold cursor-pointer text-white drop-shadow-lg" onClick={() => {
+                navigate(`/profile/${profile.user_id}`);
+              }}>
                 {profile.first_name}, {profile.age}
               </h3>
               <div className="flex items-center text-sm text-white/90 drop-shadow-md">
@@ -136,11 +139,16 @@ const ProfileCard: React.FC<{
 
 const BrowsingPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [profiles, setProfiles] = useState<CompleteProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorState, setErrorState] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [loadingActions, setLoadingActions] = useState<Set<number>>(new Set());
+  const [showAllTags, setShowAllTags] = useState(false);
+  const [showAllCities, setShowAllCities] = useState(false);
+  const [tagSearchTerm, setTagSearchTerm] = useState('');
+  const [citySearchTerm, setCitySearchTerm] = useState('');
   
   // Hooks pour les notifications et dialogs
   const { success, error: errorToast, warning } = useToast();
@@ -153,13 +161,26 @@ const BrowsingPage: React.FC = () => {
     dialogState
   } = useDialog();
   
-  // Filtres et tri
-  const [sortBy, setSortBy] = useState<'distance' | 'age' | 'fame_rating' | 'common_tags' | 'intelligent'>('intelligent');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-  const [ageRange, setAgeRange] = useState<[number, number]>([18, 65]);
-  const [maxDistance, setMaxDistance] = useState<number>(1000);
-  const [fameRange, setFameRange] = useState<[number, number]>([0, 100]);
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  // Initialisation des filtres depuis l'URL ou valeurs par défaut
+  const [filters, setFilters] = useState(() => {
+    return {
+      sortBy: (searchParams.get('sortBy') as any) || 'intelligent',
+      sortOrder: (searchParams.get('sortOrder') as any) || 'asc',
+      ageRange: [
+        parseInt(searchParams.get('ageMin') || '18'),
+        parseInt(searchParams.get('ageMax') || '65')
+      ] as [number, number],
+      maxDistance: parseInt(searchParams.get('maxDistance') || '1000'),
+      fameRange: [
+        parseInt(searchParams.get('minFame') || '0'),
+        parseInt(searchParams.get('maxFame') || '100')
+      ] as [number, number],
+      selectedTags: searchParams.getAll('tag'),
+      selectedCities: searchParams.getAll('city')
+    };
+  });
+  
+  const { sortBy, sortOrder, ageRange, maxDistance, fameRange, selectedTags, selectedCities } = filters;
 
   const getSortLabel = (value: string) => {
     switch (value) {
@@ -170,6 +191,31 @@ const BrowsingPage: React.FC = () => {
       case 'common_tags': return 'Intérêts communs';
       default: return 'Matching intelligent';
     }
+  };
+  
+  // Mise à jour de l'URL quand les filtres changent
+  const updateURLParams = (newFilters: typeof filters) => {
+    const params = new URLSearchParams();
+    
+    if (newFilters.sortBy !== 'intelligent') params.set('sortBy', newFilters.sortBy);
+    if (newFilters.sortOrder !== 'asc') params.set('sortOrder', newFilters.sortOrder);
+    if (newFilters.ageRange[0] !== 18) params.set('ageMin', newFilters.ageRange[0].toString());
+    if (newFilters.ageRange[1] !== 65) params.set('ageMax', newFilters.ageRange[1].toString());
+    if (newFilters.maxDistance !== 1000) params.set('maxDistance', newFilters.maxDistance.toString());
+    if (newFilters.fameRange[0] !== 0) params.set('minFame', newFilters.fameRange[0].toString());
+    if (newFilters.fameRange[1] !== 100) params.set('maxFame', newFilters.fameRange[1].toString());
+    
+    newFilters.selectedTags.forEach(tag => params.append('tag', tag));
+    newFilters.selectedCities.forEach(city => params.append('city', city));
+    
+    setSearchParams(params);
+  };
+  
+  // Fonctions de mise à jour des filtres
+  const updateFilters = (updates: Partial<typeof filters>) => {
+    const newFilters = { ...filters, ...updates };
+    setFilters(newFilters);
+    updateURLParams(newFilters);
   };
 
   const fetchProfiles = async () => {
@@ -184,8 +230,18 @@ const BrowsingPage: React.FC = () => {
         maxDistance,
         minFameRating: fameRange[0],
         maxFameRating: fameRange[1],
-        commonTags: selectedTags
+        commonTags: selectedTags,
+        cities: selectedCities
       });
+      
+      // Debug logs temporaires
+      console.log('🔍 DEBUG - Profils reçus:', fetchedProfiles.length);
+      if (fetchedProfiles.length > 0) {
+        console.log('🔍 DEBUG - Premier profil:', fetchedProfiles[0]);
+        console.log('🔍 DEBUG - Distance du premier profil:', fetchedProfiles[0].distance_km);
+        console.log('🔍 DEBUG - Toutes les clés du premier profil:', Object.keys(fetchedProfiles[0]));
+      }
+      
       setProfiles(fetchedProfiles);
     } catch (err) {
       setErrorState("Impossible de charger les profils pour le moment.");
@@ -193,26 +249,92 @@ const BrowsingPage: React.FC = () => {
       setIsLoading(false);
     }
   };
+  
+  const resetFilters = () => {
+    const defaultFilters = {
+      sortBy: 'intelligent' as const,
+      sortOrder: 'asc' as const,
+      ageRange: [18, 65] as [number, number],
+      maxDistance: 1000,
+      fameRange: [0, 100] as [number, number],
+      selectedTags: [],
+      selectedCities: []
+    };
+    setFilters(defaultFilters);
+    updateURLParams(defaultFilters);
+  };
 
   // Ajuster automatiquement l'ordre de tri selon le type de tri
   useEffect(() => {
-    if (sortBy === 'common_tags' || sortBy === 'fame_rating') {
-      // Pour les intérêts communs et la popularité, on veut les plus élevés en premier
-      if (sortOrder === 'asc') {
-        setSortOrder('desc');
-      }
-    } else if (sortBy === 'distance' || sortBy === 'age') {
-      // Pour la distance et l'âge, on veut les plus faibles en premier
-      if (sortOrder === 'desc') {
-        setSortOrder('asc');
-      }
+    if ((sortBy === 'common_tags' || sortBy === 'fame_rating') && sortOrder === 'asc') {
+      updateFilters({ sortOrder: 'desc' });
+    } else if ((sortBy === 'distance' || sortBy === 'age') && sortOrder === 'desc') {
+      updateFilters({ sortOrder: 'asc' });
     }
-    // Pour le tri intelligent, on garde l'ordre actuel (il a sa propre logique)
   }, [sortBy]);
 
   useEffect(() => {
     fetchProfiles();
-  }, [sortBy, sortOrder, ageRange, maxDistance, fameRange, selectedTags]);
+  }, [sortBy, sortOrder, ageRange, maxDistance, fameRange, selectedTags, selectedCities]);
+
+  const toggleTag = (tag: string) => {
+    const newTags = selectedTags.includes(tag) 
+      ? selectedTags.filter(t => t !== tag)
+      : [...selectedTags, tag];
+    updateFilters({ selectedTags: newTags });
+  };
+
+  const toggleCity = (city: string) => {
+    const newCities = selectedCities.includes(city) 
+      ? selectedCities.filter(c => c !== city)
+      : [...selectedCities, city];
+    updateFilters({ selectedCities: newCities });
+  };
+
+  // Utiliser les mêmes intérêts que dans le profil utilisateur (avec émojis)
+  const allTags = [
+    '🎵 Musique', '🎬 Cinéma', '📚 Lecture', '🏃‍♂️ Sport', '🎯 Gaming',
+    '🍳 Cuisine', '✈️ Voyage', '🎨 Art', '📸 Photo', '🌿 Nature',
+    '💃 Danse', '🎭 Théâtre', '🏔️ Randonnée', '🏊‍♀️ Natation', '🧘‍♀️ Yoga',
+    '🎸 Musique live', '🍷 Œnologie', '📱 Tech', '🐕 Animaux', '🌱 Jardinage',
+    '🏀 Basketball', '⚽ Football', '🎾 Tennis', '🏐 Volleyball', '🧗‍♀️ Escalade',
+    '⛷️ Ski', '🏂 Snowboard', '🏄‍♀️ Surf', '🤿 Plongée', '🎣 Pêche',
+    '🏕️ Camping', '🎒 Backpacking', '🏔️ Montagne', '🏖️ Plage', '🎪 Festival',
+    '🎤 Concert', '🎨 Peinture', '🗿 Sculpture', '🎨 Design', '🏛️ Architecture',
+    '📜 Histoire', '🔬 Sciences', '🌌 Astronomie', '🧬 Biologie', '⚗️ Chimie',
+    '⚛️ Physique', '🔢 Mathématiques', '🤔 Philosophie', '🧠 Psychologie', 
+    '👥 Sociologie', '💰 Économie', '🏛️ Politique', '🌍 Environnement',
+    '♻️ Écologie', '🚗 Auto', '🏍️ Moto', '🚴‍♀️ Vélo', '🏃‍♀️ Course',
+    '👗 Mode', '🔧 Bricolage'
+  ];
+
+  const allCities = [
+    'Paris', 'Lyon', 'Marseille', 'Toulouse', 'Nice', 'Bordeaux', 'Lille', 'Nantes',
+    'Strasbourg', 'Montpellier', 'Reims', 'Le Havre', 'Saint-Étienne', 'Toulon',
+    'Grenoble', 'Dijon', 'Angers', 'Nîmes', 'Villeurbanne', 'Clermont-Ferrand',
+    'Le Mans', 'Aix-en-Provence', 'Brest', 'Tours', 'Amiens', 'Limoges', 'Annecy',
+    'Perpignan', 'Boulogne-Billancourt', 'Orléans', 'Metz', 'Besançon', 'Rouen',
+    'Argenteuil', 'Mulhouse', 'Montreuil', 'Caen', 'Nancy', 'Roubaix', 'Tourcoing',
+    'Nanterre', 'Vitry-sur-Seine', 'Créteil', 'Avignon', 'Poitiers', 'Dunkerque',
+    'Aulnay-sous-Bois', 'Colombes', 'Asnières-sur-Seine', 'Versailles', 'Saint-Denis',
+    'Courbevoie', 'Fort-de-France', 'Cherbourg-Octeville', 'Rueil-Malmaison'
+  ];
+
+  // Filtrer les tags selon la recherche
+  const filteredTags = allTags.filter(tag => 
+    tag.toLowerCase().includes(tagSearchTerm.toLowerCase())
+  );
+  
+  // Tags à afficher (limités ou tous)
+  const displayedTags = showAllTags ? filteredTags : filteredTags.slice(0, 12);
+
+  // Filtrer les villes selon la recherche
+  const filteredCities = allCities.filter(city => 
+    city.toLowerCase().includes(citySearchTerm.toLowerCase())
+  );
+  
+  // Villes à afficher (limitées ou toutes)
+  const displayedCities = showAllCities ? filteredCities : filteredCities.slice(0, 8);
 
   const handleLike = async (userId: number) => {
     try {
@@ -289,18 +411,25 @@ const BrowsingPage: React.FC = () => {
     }
   };
 
-  const toggleTag = (tag: string) => {
-    setSelectedTags(prev => 
-      prev.includes(tag) 
-        ? prev.filter(t => t !== tag)
-        : [...prev, tag]
-    );
-  };
-
-  const commonTags = [
-    'Sport', 'Musique', 'Cinéma', 'Voyages', 'Cuisine', 'Art', 'Lecture',
-    'Technologie', 'Nature', 'Fitness', 'Mode', 'Photographie'
-  ];
+  // Mise à jour des filtres quand l'URL change
+  useEffect(() => {
+    const newFilters = {
+      sortBy: (searchParams.get('sortBy') as any) || 'intelligent',
+      sortOrder: (searchParams.get('sortOrder') as any) || 'asc',
+      ageRange: [
+        parseInt(searchParams.get('ageMin') || '18'),
+        parseInt(searchParams.get('ageMax') || '65')
+      ] as [number, number],
+      maxDistance: parseInt(searchParams.get('maxDistance') || '1000'),
+      fameRange: [
+        parseInt(searchParams.get('minFame') || '0'),
+        parseInt(searchParams.get('maxFame') || '100')
+      ] as [number, number],
+      selectedTags: searchParams.getAll('tag'),
+      selectedCities: searchParams.getAll('city')
+    };
+    setFilters(newFilters);
+  }, [searchParams]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
@@ -315,7 +444,7 @@ const BrowsingPage: React.FC = () => {
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <Label htmlFor="sort-by">Trier par:</Label>
-              <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
+              <Select value={sortBy} onValueChange={(value: any) => updateFilters({ sortBy: value })}>
                 <SelectTrigger className="w-40">
                   <SelectValue placeholder={getSortLabel(sortBy)} />
                 </SelectTrigger>
@@ -333,7 +462,7 @@ const BrowsingPage: React.FC = () => {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                onClick={() => updateFilters({ sortOrder: sortOrder === 'asc' ? 'desc' : 'asc' })}
               >
                 {sortOrder === 'asc' ? <SortAsc className="w-4 h-4" /> : <SortDesc className="w-4 h-4" />}
                 {sortOrder === 'asc' ? 'Croissant' : 'Décroissant'}
@@ -362,7 +491,7 @@ const BrowsingPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Panneau de filtres */}
+        {/* Panneau de filtres rapides */}
         {showFilters && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
@@ -375,7 +504,7 @@ const BrowsingPage: React.FC = () => {
                 <Label>Âge: {ageRange[0]} - {ageRange[1]} ans</Label>
                 <Slider
                   value={ageRange}
-                  onValueChange={(value) => setAgeRange(value as [number, number])}
+                  onValueChange={(value) => updateFilters({ ageRange: value as [number, number] })}
                   min={18}
                   max={80}
                   step={1}
@@ -387,7 +516,7 @@ const BrowsingPage: React.FC = () => {
                 <Label>Distance max: {maxDistance} km</Label>
                 <Slider
                   value={[maxDistance]}
-                  onValueChange={(value) => setMaxDistance(value[0])}
+                  onValueChange={(value) => updateFilters({ maxDistance: value[0] })}
                   min={1}
                   max={1000}
                   step={10}
@@ -399,7 +528,7 @@ const BrowsingPage: React.FC = () => {
                 <Label>Popularité: {fameRange[0]} - {fameRange[1]}</Label>
                 <Slider
                   value={fameRange}
-                  onValueChange={(value) => setFameRange(value as [number, number])}
+                  onValueChange={(value) => updateFilters({ fameRange: value as [number, number] })}
                   min={0}
                   max={100}
                   step={1}
@@ -408,20 +537,98 @@ const BrowsingPage: React.FC = () => {
               </div>
             </div>
             
-            <div>
-              <Label>Centres d'intérêt communs:</Label>
-              <div className="flex flex-wrap gap-2 mt-2">
-                {commonTags.map(tag => (
-                  <Button
-                    key={tag}
-                    variant={selectedTags.includes(tag) ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => toggleTag(tag)}
-                    className="text-xs"
-                  >
-                    {tag}
-                  </Button>
-                ))}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label>Afficher uniquement les profils avec TOUS ces intérêts:</Label>
+                {selectedTags.length > 0 && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    ✅ Seuls les profils ayant TOUS ces intérêts ({selectedTags.length}) seront affichés
+                  </p>
+                )}
+                <div className="space-y-2 mt-2">
+                  <Input
+                    placeholder="Rechercher un intérêt..."
+                    value={tagSearchTerm}
+                    onChange={(e) => setTagSearchTerm(e.target.value)}
+                    className="text-sm"
+                  />
+                  <div className="flex flex-wrap gap-2">
+                    {displayedTags.map(tag => (
+                      <Button
+                        key={tag}
+                        variant={selectedTags.includes(tag) ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => toggleTag(tag)}
+                        className="text-xs"
+                      >
+                        {tag}
+                      </Button>
+                    ))}
+                  </div>
+                  {filteredTags.length > 12 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowAllTags(!showAllTags)}
+                      className="text-xs text-gray-600 hover:text-gray-800"
+                    >
+                      {showAllTags ? (
+                        <><ChevronUp className="w-3 h-3 mr-1" />Voir moins</>
+                      ) : (
+                        <><ChevronDown className="w-3 h-3 mr-1" />Voir plus ({filteredTags.length - 12} autres)</>
+                      )}
+                    </Button>
+                  )}
+                </div>
+              </div>
+              
+              <div>
+                <Label>Afficher uniquement les profils de ces villes:</Label>
+                {selectedCities.length > 0 && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    ✅ Seuls les profils de ces villes seront affichés
+                  </p>
+                )}
+                <div className="space-y-2 mt-2">
+                  <Input
+                    placeholder="Rechercher une ville..."
+                    value={citySearchTerm}
+                    onChange={(e) => setCitySearchTerm(e.target.value)}
+                    className="text-sm"
+                  />
+                  <div className="flex flex-wrap gap-2">
+                    {displayedCities.map(city => (
+                      <Button
+                        key={city}
+                        variant={selectedCities.includes(city) ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => toggleCity(city)}
+                        className="text-xs"
+                      >
+                        {city}
+                      </Button>
+                    ))}
+                  </div>
+                  {filteredCities.length > 8 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowAllCities(!showAllCities)}
+                      className="text-xs text-gray-600 hover:text-gray-800"
+                    >
+                      {showAllCities ? (
+                        <><ChevronUp className="w-3 h-3 mr-1" />Voir moins</>
+                      ) : (
+                        <><ChevronDown className="w-3 h-3 mr-1" />Voir plus ({filteredCities.length - 8} autres)</>
+                      )}
+                    </Button>
+                  )}
+                  {selectedCities.length > 0 && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      {selectedCities.length} ville{selectedCities.length > 1 ? 's' : ''} sélectionnée{selectedCities.length > 1 ? 's' : ''}
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
           </motion.div>
@@ -451,12 +658,7 @@ const BrowsingPage: React.FC = () => {
           <Search className="w-20 h-20 text-gray-400 mb-4" />
           <h3 className="text-2xl font-semibold text-twilight mb-2">Aucun profil trouvé</h3>
           <p className="text-twilight/60 mb-6">Essayez d'ajuster vos filtres pour voir plus de profils.</p>
-          <Button onClick={() => {
-            setAgeRange([18, 65]);
-            setMaxDistance(50);
-            setFameRange([0, 100]);
-            setSelectedTags([]);
-          }}>
+          <Button onClick={resetFilters}>
             Réinitialiser les filtres
           </Button>
         </div>
@@ -473,7 +675,7 @@ const BrowsingPage: React.FC = () => {
               profile={profile} 
               onLike={handleLike}
               onUnlike={handleUnlike}
-              isLiked={false} // Pour le moment, on affiche toujours comme non-liké dans browse
+              isLiked={false}
               isLoading={loadingActions.has(profile.user_id)}
             />
           ))}

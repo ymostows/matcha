@@ -317,9 +317,21 @@ router.get('/browse', authenticateToken, async (req: Request, res: Response): Pr
       ageMax,
       maxDistance = 500,
       minFameRating = 0,
-      maxFameRating = 100,
-      commonTags = []
+      maxFameRating = 100
     } = req.query;
+
+    // Extraire les tableaux avec gestion correcte des paramètres multiples
+    const commonTags = Array.isArray(req.query.commonTags) 
+      ? req.query.commonTags as string[]
+      : req.query.commonTags 
+        ? [req.query.commonTags as string]
+        : [];
+        
+    const cities = Array.isArray(req.query.cities) 
+      ? req.query.cities as string[]
+      : req.query.cities 
+        ? [req.query.cities as string]
+        : [];
 
     // Obtenir le profil de l'utilisateur actuel
     const currentUserProfile = await ProfileModel.findByUserId(userId);
@@ -460,19 +472,31 @@ router.get('/browse', authenticateToken, async (req: Request, res: Response): Pr
     }
 
     if (Array.isArray(commonTags) && commonTags.length > 0) {
-      // Recherche flexible qui ignore les émojis et fait une correspondance partielle
-      query += ` AND p.interests IS NOT NULL AND (`;
-      const tagConditions = commonTags.map((tag, index) => {
+      // Logique d'inclusion : afficher seulement les profils qui ont TOUS ces intérêts
+      // Nettoyer les tags côté serveur avant de les utiliser dans la requête
+      const cleanedTags = commonTags.map(tag => tag.replace(/[^\w\s]/g, '').trim());
+      
+      const tagConditions = cleanedTags.map((cleanedTag, index) => {
         const currentParamIndex = paramIndex + index;
         return `EXISTS (
           SELECT 1 FROM unnest(p.interests) AS interest 
-          WHERE LOWER(regexp_replace(interest, '[^\w\s]', '', 'g')) LIKE LOWER('%' || $${currentParamIndex} || '%')
+          WHERE LOWER(regexp_replace(interest, '[^\\w\\s]', '', 'g')) LIKE LOWER('%' || $${currentParamIndex} || '%')
         )`;
       });
-      query += tagConditions.join(' OR ');
-      query += ')';
-      params.push(...commonTags);
-      paramIndex += commonTags.length;
+      query += ` AND (${tagConditions.join(' AND ')})`;
+      params.push(...cleanedTags);
+      paramIndex += cleanedTags.length;
+    }
+
+    // Ajouter le filtre d'inclusion par villes spécifiques
+    if (Array.isArray(cities) && cities.length > 0) {
+      const cityConditions = cities.map((city, index) => {
+        const currentParamIndex = paramIndex + index;
+        return `LOWER(p.city) LIKE LOWER('%' || $${currentParamIndex} || '%')`;
+      });
+      query += ` AND (${cityConditions.join(' OR ')})`;
+      params.push(...cities);
+      paramIndex += cities.length;
     }
 
     // Ajouter le filtre de distance
@@ -514,6 +538,7 @@ router.get('/browse', authenticateToken, async (req: Request, res: Response): Pr
 
     // Logs de debug pour le développement
     if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 RAW QUERY DEBUG:', JSON.stringify(req.query, null, 2));
       console.log('📊 Browse profiles debug:', {
         currentUser: {
           id: userId,
@@ -523,14 +548,31 @@ router.get('/browse', authenticateToken, async (req: Request, res: Response): Pr
         },
         filters: {
           sortBy, sortOrder, ageMin, ageMax, maxDistance, 
-          minFameRating, maxFameRating, commonTags
+          minFameRating, maxFameRating, commonTags, cities
         },
         sqlParams: {
           userInterests: userInterests,
-          userCoordinates: `${currentUserProfile.location_lat}, ${currentUserProfile.location_lng}`,
+          userCoordinates: `${currentUserProfile.location_lat || 'null'}, ${currentUserProfile.location_lng || 'null'}`,
           parametersCount: params.length
+        },
+        rawQuery: {
+          commonTags: req.query.commonTags,
+          cities: req.query.cities,
+          isCommonTagsArray: Array.isArray(req.query.commonTags),
+          isCitiesArray: Array.isArray(req.query.cities)
         }
       });
+      const cleanedTagsForDebug = commonTags.map(tag => tag.replace(/[^\w\s]/g, '').trim());
+      console.log('✅ PROCESSED ARRAYS:', {
+        commonTagsLength: commonTags.length,
+        commonTagsContent: commonTags,
+        cleanedTagsContent: cleanedTagsForDebug,
+        citiesLength: cities.length,
+        citiesContent: cities
+      });
+      
+      // Afficher les premiers 500 caractères de la requête SQL générée
+      console.log('🔍 SQL Query preview:', query.substring(0, 500) + '...');
     }
 
     const result = await pool.query(query, params);
@@ -765,8 +807,8 @@ router.get('/:userId', authenticateToken, async (req: Request, res: Response): P
     let visitorCoordinates = undefined;
     if (visitorProfile && visitorProfile.location_lat && visitorProfile.location_lng) {
       visitorCoordinates = {
-        latitude: parseFloat(visitorProfile.location_lat),
-        longitude: parseFloat(visitorProfile.location_lng)
+        latitude: typeof visitorProfile.location_lat === 'string' ? parseFloat(visitorProfile.location_lat) : visitorProfile.location_lat,
+        longitude: typeof visitorProfile.location_lng === 'string' ? parseFloat(visitorProfile.location_lng) : visitorProfile.location_lng
       };
     }
 
@@ -1528,5 +1570,197 @@ if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
     }
   });
 }
+
+// GET /api/profile/tags/suggestions - Obtenir des suggestions de tags
+router.get('/tags/suggestions', authenticateToken, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { q = '' } = req.query; // terme de recherche
+    
+    const query = `
+      SELECT DISTINCT unnest(interests) as tag, COUNT(*) as usage_count
+      FROM profiles 
+      WHERE interests IS NOT NULL 
+        AND array_length(interests, 1) > 0
+        AND (CASE WHEN $1 != '' THEN 
+          EXISTS (
+            SELECT 1 FROM unnest(interests) as interest 
+            WHERE LOWER(interest) LIKE LOWER('%' || $1 || '%')
+          )
+        ELSE true END)
+      GROUP BY tag
+      ORDER BY usage_count DESC, tag ASC
+      LIMIT 50
+    `;
+    
+    const result = await pool.query(query, [q]);
+    
+    res.json({
+      success: true,
+      tags: result.rows.map(row => ({
+        tag: row.tag,
+        usage_count: parseInt(row.usage_count)
+      }))
+    });
+  } catch (error) {
+    console.error('Erreur suggestions tags:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erreur serveur' 
+    });
+  }
+});
+
+// GET /api/profile/cities/suggestions - Obtenir des suggestions de villes
+router.get('/cities/suggestions', authenticateToken, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { q = '' } = req.query; // terme de recherche
+    
+    const query = `
+      SELECT city, COUNT(*) as user_count
+      FROM profiles 
+      WHERE city IS NOT NULL 
+        AND city != ''
+        AND (CASE WHEN $1 != '' THEN 
+          LOWER(city) LIKE LOWER('%' || $1 || '%')
+        ELSE true END)
+      GROUP BY city
+      HAVING COUNT(*) >= 1
+      ORDER BY user_count DESC, city ASC
+      LIMIT 30
+    `;
+    
+    const result = await pool.query(query, [q]);
+    
+    res.json({
+      success: true,
+      cities: result.rows.map(row => ({
+        city: row.city,
+        user_count: parseInt(row.user_count)
+      }))
+    });
+  } catch (error) {
+    console.error('Erreur suggestions villes:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erreur serveur' 
+    });
+  }
+});
+
+// POST /api/profile/migrate-coordinates - Migrer les profils existants pour ajouter des coordonnées GPS
+router.post('/migrate-coordinates', authenticateToken, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = (req as any).user.userId;
+    
+    // Vérifier si c'est un admin ou pour des tests (optionnel)
+    console.log(`🔄 Migration des coordonnées demandée par l'utilisateur ${userId}`);
+    
+    // Trouver tous les profils sans coordonnées GPS valides
+    const profilesQuery = await pool.query(`
+      SELECT user_id, city 
+      FROM profiles 
+      WHERE city IS NOT NULL 
+        AND city != ''
+        AND (location_lat IS NULL OR location_lng IS NULL 
+             OR location_lat = 0 OR location_lng = 0)
+      LIMIT 50
+    `);
+    
+    let migratedCount = 0;
+    let failedCount = 0;
+    
+    for (const profile of profilesQuery.rows) {
+      try {
+        const coordinates = await (await import('../utils/geocoding')).GeocodingService.geocodeCity(profile.city);
+        
+        if (coordinates && coordinates.latitude !== 0 && coordinates.longitude !== 0) {
+          await pool.query(`
+            UPDATE profiles 
+            SET location_lat = $1, location_lng = $2, updated_at = CURRENT_TIMESTAMP
+            WHERE user_id = $3
+          `, [coordinates.latitude, coordinates.longitude, profile.user_id]);
+          
+          console.log(`✅ Migré: ${profile.city} -> ${coordinates.latitude}, ${coordinates.longitude}`);
+          migratedCount++;
+        } else {
+          console.log(`❌ Échec migration: ${profile.city}`);
+          failedCount++;
+        }
+      } catch (error) {
+        console.error(`Erreur migration profil ${profile.user_id}:`, error);
+        failedCount++;
+      }
+    }
+    
+    res.json({
+      success: true,
+      message: `Migration terminée: ${migratedCount} profils migrés, ${failedCount} échecs`,
+      migratedCount,
+      failedCount
+    });
+    
+  } catch (error) {
+    console.error('Erreur migration coordonnées:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erreur serveur lors de la migration' 
+    });
+  }
+});
+
+// POST /api/profile/geocode-city - Géolocaliser une ville
+router.post('/geocode-city', authenticateToken, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { cityName } = req.body;
+
+    if (!cityName || typeof cityName !== 'string' || cityName.trim().length < 2) {
+      res.status(400).json({ 
+        success: false, 
+        message: 'Nom de ville requis (minimum 2 caractères)' 
+      });
+      return;
+    }
+
+    const cleanCityName = cityName.trim();
+    
+    // Utiliser notre service de géocodage pour trouver les coordonnées
+    const coordinates = await (await import('../utils/geocoding')).GeocodingService.geocodeCity(cleanCityName);
+    
+    if (coordinates) {
+      // Déterminer la précision en fonction de la méthode utilisée
+      let precision = 'medium';
+      let formattedName = cleanCityName;
+      
+      // Si les coordonnées ne sont pas des arrondis simples, c'est probablement de Nominatim (précis)
+      if (coordinates.latitude % 0.01 !== 0 || coordinates.longitude % 0.01 !== 0) {
+        precision = 'high';
+        formattedName = `${cleanCityName}, France`;
+      } else {
+        precision = 'medium';
+        formattedName = `${cleanCityName} (approximatif)`;
+      }
+
+      res.json({
+        success: true,
+        coordinates,
+        formattedName,
+        precision,
+        message: 'Ville géolocalisée avec succès'
+      });
+    } else {
+      res.json({
+        success: false,
+        message: 'Impossible de localiser cette ville',
+        coordinates: null
+      });
+    }
+  } catch (error) {
+    console.error('Erreur géocodage ville:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erreur serveur lors de la géolocalisation' 
+    });
+  }
+});
 
 export default router; 

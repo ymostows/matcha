@@ -11,18 +11,44 @@ export class ProfileModel {
     const client = await pool.connect();
     
     try {
-      // Générer public_city si on a des coordonnées GPS et pas de public_city
+      // Gérer les coordonnées GPS et le géocodage
+      let finalLat = profileData.location_lat;
+      let finalLng = profileData.location_lng;
       let publicCity = profileData.public_city;
-      if (!publicCity && profileData.location_lat && profileData.location_lng) {
+
+      // Si on n'a pas de coordonnées GPS mais qu'on a une ville, essayer de la géolocaliser
+      if ((!finalLat || !finalLng || (finalLat === 0 && finalLng === 0)) && profileData.city) {
+        try {
+          console.log(`🌍 Tentative de géolocalisation pour la ville: ${profileData.city}`);
+          const coordinates = await GeocodingService.geocodeCity(profileData.city);
+          if (coordinates && coordinates.latitude !== 0 && coordinates.longitude !== 0) {
+            finalLat = coordinates.latitude;
+            finalLng = coordinates.longitude;
+            console.log(`✅ Ville géolocalisée: ${profileData.city} -> ${finalLat}, ${finalLng}`);
+          } else {
+            console.log(`❌ Impossible de géolocaliser: ${profileData.city}`);
+          }
+        } catch (error) {
+          console.warn('Échec du géocodage automatique de la ville:', error);
+        }
+      }
+
+      // Générer public_city si on a des coordonnées GPS et pas de public_city
+      if (!publicCity && finalLat && finalLng && finalLat !== 0 && finalLng !== 0) {
         try {
           publicCity = await GeocodingService.getPublicCityName({
-            latitude: profileData.location_lat,
-            longitude: profileData.location_lng
+            latitude: finalLat,
+            longitude: finalLng
           });
         } catch (error) {
           console.warn('Échec du géocodage lors de la création du profil:', error);
           publicCity = profileData.city || 'Localisation non disponible';
         }
+      }
+
+      // Si on n'a toujours pas de public_city, utiliser la ville saisie
+      if (!publicCity) {
+        publicCity = profileData.city || 'Localisation non disponible';
       }
 
       // Vérifier si le profil existe déjà
@@ -53,8 +79,8 @@ export class ProfileModel {
           profileData.sexual_orientation,
           profileData.interests,
           profileData.city,
-          profileData.location_lat,
-          profileData.location_lng,
+          finalLat,
+          finalLng,
           publicCity,
           (profileData as any).isComplete || false
         ];
@@ -74,8 +100,8 @@ export class ProfileModel {
           profileData.sexual_orientation,
           profileData.interests,
           profileData.city,
-          profileData.location_lat,
-          profileData.location_lng,
+          finalLat,
+          finalLng,
           publicCity,
           (profileData as any).isComplete || false
         ];

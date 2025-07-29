@@ -253,24 +253,85 @@ export const LocationPickerSimple: React.FC<LocationPickerSimpleProps> = ({
     }
   };
 
-  // Saisie manuelle
-  const handleManualCity = (city: string) => {
+  // Saisie manuelle avec géolocalisation automatique
+  const handleManualCity = async (city: string) => {
     setManualCity(city);
-    setLocation(null); // Reset coordinates
     setError(null);
     
-    // Créer une nouvelle localisation manuelle si l'utilisateur a saisi une ville
-    if (city.trim()) {
-      // Pas de coordonnées GPS pour une saisie manuelle
+    if (!city.trim()) {
+      setLocation(null);
+      return;
+    }
+
+    const cleanCity = city.trim();
+    
+    // Essayer de géolocaliser automatiquement la ville saisie
+    try {
+      setStatus(`Recherche de la localisation de "${cleanCity}"...`);
+      
+      // Appeler notre API backend pour géolocaliser la ville
+      const response = await fetch('/api/profile/geocode-city', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ cityName: cleanCity })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.coordinates) {
+          // On a trouvé des coordonnées pour cette ville
+          setLocation({
+            latitude: data.coordinates.latitude,
+            longitude: data.coordinates.longitude,
+            city: cleanCity,
+            publicCity: data.formattedName || cleanCity,
+            method: 'manual',
+            precision: data.precision || 'medium',
+            accuracy: `Géolocalisée automatiquement`
+          });
+          setStatus(`Localisation trouvée : ${data.formattedName || cleanCity}`);
+        } else {
+          // Pas de coordonnées trouvées, utiliser seulement le nom
+          setLocation({
+            latitude: 0, // Valeurs temporaires
+            longitude: 0,
+            city: cleanCity,
+            publicCity: cleanCity,
+            method: 'manual',
+            precision: 'low',
+            accuracy: 'Saisie manuelle (géolocalisation échouée)'
+          });
+          setStatus(`Localisation définie : ${cleanCity} (sans coordonnées GPS)`);
+        }
+      } else {
+        // Erreur API, utiliser seulement le nom
+        setLocation({
+          latitude: 0,
+          longitude: 0,
+          city: cleanCity,
+          publicCity: cleanCity,
+          method: 'manual',
+          precision: 'low',
+          accuracy: 'Saisie manuelle (pas de coordonnées GPS)'
+        });
+        setStatus(`Localisation définie : ${cleanCity}`);
+      }
+    } catch (error) {
+      console.warn('Erreur géolocalisation automatique:', error);
+      // En cas d'erreur, utiliser seulement le nom
       setLocation({
-        latitude: 0, // Valeurs temporaires, ne seront pas utilisées
+        latitude: 0,
         longitude: 0,
-        city: city.trim(),
-        publicCity: city.trim(),
+        city: cleanCity,
+        publicCity: cleanCity,
         method: 'manual',
         precision: 'low',
         accuracy: 'Saisie manuelle (pas de coordonnées GPS)'
       });
+      setStatus(`Localisation définie : ${cleanCity}`);
     }
   };
 

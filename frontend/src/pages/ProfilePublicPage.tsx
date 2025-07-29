@@ -102,6 +102,11 @@ export const ProfilePublicPage: React.FC = () => {
         profileData = await profileApi.getProfile(userIdNumber);
       }
       
+      // Debug logs temporaires
+      console.log('🔍 DEBUG ProfilePublic - Profil reçu:', profileData);
+      console.log('🔍 DEBUG ProfilePublic - Distance:', profileData.distance_km);
+      console.log('🔍 DEBUG ProfilePublic - Toutes les clés:', Object.keys(profileData));
+      
       setProfile(profileData);
     } catch (err) {
       console.error('Erreur lors du chargement du profil:', err);
@@ -463,7 +468,7 @@ export const ProfilePublicPage: React.FC = () => {
                         <MapPin className="w-4 h-4" />
                         <span>
                           {profile.city || 'Non spécifié'}
-                          {profile.distance_km !== undefined && profile.distance_km !== null && (
+                          {profile.distance_km !== undefined && profile.distance_km !== null && profile.distance_km < 999999 && (
                             <span className="ml-1 text-xs text-twilight/60">
                               • {profile.distance_km < 1 ? '<1' : Math.round(profile.distance_km)} km
                             </span>

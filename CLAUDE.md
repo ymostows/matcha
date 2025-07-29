@@ -77,6 +77,10 @@ npm run generate:realistic    # Generate realistic profiles
 npm run generate:ai           # Generate AI profiles
 npm run reset:profiles        # Clean and regenerate profiles
 
+# Location system scripts
+npm run migrate:location      # Migrate existing profiles to new location system
+npm run optimize:location     # Optimize database indexes for location queries
+
 # Testing
 npm run test
 npm run test:watch
