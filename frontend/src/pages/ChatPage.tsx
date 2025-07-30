@@ -326,11 +326,7 @@ const ChatPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-rose-50 via-pink-50 to-orange-50 p-4">
       <div className="max-w-4xl mx-auto">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-6"
-        >
+        <div className="mb-6">
           <Button
             variant="outline"
             onClick={() => navigate('/dashboard')}
@@ -339,9 +335,8 @@ const ChatPage: React.FC = () => {
             <ArrowLeft className="w-4 h-4 mr-2" />
             Retour au dashboard
           </Button>
-        </motion.div>
-
-        <Card className="h-[600px] flex flex-col overflow-hidden">
+        </div>
+          <Card className="h-[600px] flex flex-col overflow-hidden">
           <CardHeader className="flex-shrink-0">
             <CardTitle className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -396,6 +391,7 @@ const ChatPage: React.FC = () => {
                     key={message.id}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3 }}
                     className={`flex ${user && message.sender_id === user.id ? 'justify-end' : 'justify-start'} w-full`}
                   >
                     <div
@@ -430,11 +426,7 @@ const ChatPage: React.FC = () => {
               
               {/* Indicateur de typing */}
               {typingUsers.length > 0 && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="px-0 pb-2"
-                >
+                <div className="px-0 pb-2">
                   <div className="flex items-center gap-2 text-sm text-gray-500">
                     <div className="flex space-x-1">
                       <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
@@ -448,7 +440,7 @@ const ChatPage: React.FC = () => {
                       }
                     </span>
                   </div>
-                </motion.div>
+                </div>
               )}
               
               {/* Référence pour le scroll automatique */}

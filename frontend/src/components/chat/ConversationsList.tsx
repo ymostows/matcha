@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import { MessageCircle, Clock, User, Search } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Input } from '../ui/input';
@@ -208,12 +207,9 @@ const ConversationsList: React.FC<ConversationsListProps> = ({ className = '' })
           </div>
         ) : (
           <div className="divide-y">
-            {filteredConversations.map((conversation, index) => (
-              <motion.div
+            {filteredConversations.map((conversation) => (
+              <div
                 key={conversation.id}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: index * 0.1 }}
                 className="p-4 hover:bg-gray-50 cursor-pointer transition-colors"
                 onClick={() => handleConversationClick(conversation)}
               >
@@ -250,7 +246,7 @@ const ConversationsList: React.FC<ConversationsListProps> = ({ className = '' })
                     </p>
                   </div>
                 </div>
-              </motion.div>
+              </div>
             ))}
           </div>
         )}
