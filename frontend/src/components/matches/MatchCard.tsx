@@ -30,8 +30,7 @@ export const MatchCard: React.FC<MatchCardProps> = ({
   };
 
   const handleChat = () => {
-    // Chat sera bientôt disponible
-    alert('Chat bientôt disponible !');
+    navigate('/conversations');
   };
 
   // Construction de l'URL de l'image avec l'utilitaire centralisé

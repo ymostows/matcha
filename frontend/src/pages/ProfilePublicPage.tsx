@@ -22,6 +22,7 @@ import { PhotoViewer } from '../components/ui/PhotoViewer';
 import { ConfirmDialog, MatchDialog } from '../components/ui/dialog';
 import { PromptDialog } from '../components/ui/prompt-dialog';
 import { profileApi, CompleteProfile } from '../services/profileApi';
+
 import { getPhotoUrl as getStandardPhotoUrl } from '../utils/imageUtils';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../hooks/useToast';
@@ -303,6 +304,11 @@ export const ProfilePublicPage: React.FC = () => {
         }
       }
     });
+  };
+
+  // Gérer le chat
+  const handleChat = () => {
+    navigate('/conversations');
   };
 
   if (isLoading) {
@@ -634,9 +640,13 @@ export const ProfilePublicPage: React.FC = () => {
                   </Button>
                   
                   {likeStatus.isMatched && (
-                    <Button variant="outline" className="w-full py-4 sm:py-3 text-base sm:text-sm" disabled>
+                    <Button 
+                      variant="outline" 
+                      className="w-full py-4 sm:py-3 text-base sm:text-sm bg-primary text-white hover:bg-primary/90 border-primary" 
+                      onClick={handleChat}
+                    >
                       <MessageCircle className="w-4 h-4 mr-2" />
-                      Envoyer un message
+                      Chat
                     </Button>
                   )}
                 </div>

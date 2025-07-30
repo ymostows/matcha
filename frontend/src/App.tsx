@@ -16,6 +16,7 @@ import { ProfileEditPage } from './pages/ProfileEditPage';
 import { ProfilePublicPage } from './pages/ProfilePublicPage';
 import BrowsingPage from './pages/BrowsingPage';
 import ChatPage from './pages/ChatPage';
+import ConversationsPage from './pages/ConversationsPage';
 import { Header } from './components/layout/Header';
 // import { NotificationDebug } from './components/debug/NotificationDebug';
 // import { ToastContainer } from 'react-toastify';
@@ -149,6 +150,14 @@ const AppContent: React.FC = () => {
       } />
       
       {/* Routes protégées - Chat */}
+      <Route path="/conversations" element={
+        <ProtectedRoute requireCompleteProfile={true}>
+          <AppLayout>
+            <ConversationsPage />
+          </AppLayout>
+        </ProtectedRoute>
+      } />
+      
       <Route path="/chat/:conversationId" element={
         <ProtectedRoute requireCompleteProfile={true}>
           <ChatPage />

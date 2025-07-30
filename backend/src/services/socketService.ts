@@ -118,6 +118,9 @@ export class SocketService {
       });
     });
 
+    // Note: L'envoi de messages se fait maintenant via l'API REST
+    // qui émet automatiquement l'événement 'new_message' en temps réel
+
     // Marquer les notifications comme lues en temps réel
     socket.on('mark_notification_read', async (notificationId: number) => {
       try {

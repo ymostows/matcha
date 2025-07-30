@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { authenticateToken } from '../middleware/auth';
 import pool from '../config/database';
 import { createNotification, NotificationType } from './notifications';
+import { getSocketService } from '../services/socketService';
 
 const router = Router();
 
@@ -86,7 +87,7 @@ router.get('/conversations', authenticateToken, async (req: Request, res: Respon
 router.get('/conversations/:conversationId/messages', authenticateToken, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = (req as any).user.userId;
-    const conversationId = parseInt(req.params.conversationId);
+    const conversationId = parseInt(req.params.conversationId!);
     const limit = parseInt(req.query.limit as string) || 50;
     const offset = parseInt(req.query.offset as string) || 0;
 
@@ -147,7 +148,7 @@ router.get('/conversations/:conversationId/messages', authenticateToken, async (
 router.post('/conversations/:conversationId/messages', authenticateToken, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = (req as any).user.userId;
-    const conversationId = parseInt(req.params.conversationId);
+    const conversationId = parseInt(req.params.conversationId!);
     const { content } = req.body;
 
     if (isNaN(conversationId)) {
@@ -206,11 +207,36 @@ router.post('/conversations/:conversationId/messages', authenticateToken, async 
 
       const newMessage = messageResult.rows[0];
 
+      // Obtenir le nom de l'expéditeur pour l'événement Socket.io
+      const senderResult = await client.query('SELECT first_name FROM users WHERE id = $1', [userId]);
+      const senderName = senderResult.rows[0]?.first_name || 'Utilisateur';
+
       res.json({
         success: true,
         message: 'Message envoyé avec succès',
-        messageData: newMessage
+        messageData: {
+          ...newMessage,
+          sender_name: senderName
+        }
       });
+
+      // Émettre l'événement Socket.io en temps réel
+      try {
+        const socketService = getSocketService();
+        socketService.getIO().to(`conversation_${conversationId}`).emit('new_message', {
+          id: newMessage.id,
+          conversation_id: newMessage.conversation_id,
+          sender_id: newMessage.sender_id,
+          content: newMessage.content,
+          is_read: newMessage.is_read,
+          created_at: newMessage.created_at,
+          sender_name: senderName
+        });
+        console.log(`💬 Événement new_message émis pour conversation ${conversationId}`);
+      } catch (socketError) {
+        console.error('Erreur émission événement Socket.io:', socketError);
+        // Ne pas faire échouer la requête si Socket.io a un problème
+      }
 
     } finally {
       client.release();
@@ -220,9 +246,9 @@ router.post('/conversations/:conversationId/messages', authenticateToken, async 
     const conversation = conversationCheck.rows[0];
     const recipientId = conversation.user1_id === userId ? conversation.user2_id : conversation.user1_id;
     
-    // Obtenir le nom de l'expéditeur
-    const senderResult = await pool.query('SELECT first_name FROM users WHERE id = $1', [userId]);
-    const senderName = senderResult.rows[0]?.first_name || 'Utilisateur';
+    // Obtenir le nom de l'expéditeur pour la notification
+    const senderForNotif = await pool.query('SELECT first_name FROM users WHERE id = $1', [userId]);
+    const senderName = senderForNotif.rows[0]?.first_name || 'Utilisateur';
     
     await createNotification(
       recipientId,
@@ -248,7 +274,7 @@ router.post('/conversations/:conversationId/messages', authenticateToken, async 
 router.put('/conversations/:conversationId/read', authenticateToken, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = (req as any).user.userId;
-    const conversationId = parseInt(req.params.conversationId);
+    const conversationId = parseInt(req.params.conversationId!);
 
     if (isNaN(conversationId)) {
       res.status(400).json({ 
@@ -273,16 +299,54 @@ router.put('/conversations/:conversationId/read', authenticateToken, async (req:
     }
 
     // Marquer tous les messages de cette conversation comme lus (sauf ceux envoyés par l'utilisateur)
-    await pool.query(`
+    const updatedMessages = await pool.query(`
       UPDATE messages 
       SET is_read = true 
       WHERE conversation_id = $1 AND sender_id != $2 AND is_read = false
+      RETURNING id, sender_id
     `, [conversationId, userId]);
 
     res.json({
       success: true,
-      message: 'Messages marqués comme lus'
+      message: 'Messages marqués comme lus',
+      updatedCount: updatedMessages.rows.length
     });
+
+    // Émettre l'événement Socket.io pour notifier les expéditeurs que leurs messages ont été lus
+    try {
+      const socketService = getSocketService();
+      
+      // Pour chaque message marqué comme lu, notifier l'expéditeur
+      for (const message of updatedMessages.rows) {
+        socketService.getIO().to(`user_${message.sender_id}`).emit('message_read', {
+          messageId: message.id,
+          conversationId: conversationId,
+          readBy: userId
+        });
+      }
+
+      // Également émettre vers la conversation pour synchroniser tous les clients
+      socketService.getIO().to(`conversation_${conversationId}`).emit('messages_read', {
+        conversationId: conversationId,
+        readBy: userId,
+        messageIds: updatedMessages.rows.map(m => m.id)
+      });
+
+      console.log(`📖 ${updatedMessages.rows.length} messages marqués comme lus dans conversation ${conversationId}`);
+      
+      // Supprimer les notifications de messages de cette conversation pour l'utilisateur
+      await pool.query(`
+        UPDATE notifications 
+        SET is_read = true 
+        WHERE user_id = $1 
+        AND type = 'MESSAGE' 
+        AND data->>'conversationId' = $2::text
+        AND is_read = false
+      `, [userId, conversationId.toString()]);
+      
+    } catch (socketError) {
+      console.error('Erreur émission événement messages lus:', socketError);
+    }
 
   } catch (error) {
     console.error('Erreur marquer messages lus:', error);
@@ -297,7 +361,7 @@ router.put('/conversations/:conversationId/read', authenticateToken, async (req:
 router.get('/conversations/:userId/start', authenticateToken, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = (req as any).user.userId;
-    const otherUserId = parseInt(req.params.userId);
+    const otherUserId = parseInt(req.params.userId!);
 
     if (isNaN(otherUserId)) {
       res.status(400).json({ 
@@ -318,7 +382,7 @@ router.get('/conversations/:userId/start', authenticateToken, async (req: Reques
     // Vérifier qu'il y a un match entre les deux utilisateurs
     const matchCheck = await pool.query(
       'SELECT 1 FROM matches WHERE (user1_id = $1 AND user2_id = $2) OR (user1_id = $2 AND user2_id = $1)',
-      [Math.min(userId, otherUserId), Math.max(userId, otherUserId)]
+      [userId, otherUserId]
     );
 
     if (matchCheck.rows.length === 0) {
@@ -332,7 +396,7 @@ router.get('/conversations/:userId/start', authenticateToken, async (req: Reques
     // Vérifier si une conversation existe déjà
     let conversationResult = await pool.query(
       'SELECT id FROM conversations WHERE (user1_id = $1 AND user2_id = $2) OR (user1_id = $2 AND user2_id = $1)',
-      [Math.min(userId, otherUserId), Math.max(userId, otherUserId)]
+      [userId, otherUserId]
     );
 
     let conversationId;
