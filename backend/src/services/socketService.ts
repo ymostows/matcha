@@ -63,7 +63,6 @@ export class SocketService {
         socket.username = userResult.rows[0].username;
         next();
       } catch (error) {
-        console.error('Erreur authentification Socket.IO:', error);
         next(new Error('Token invalide'));
       }
     });
@@ -71,7 +70,6 @@ export class SocketService {
 
   private setupEventHandlers() {
     this.io.on('connection', (socket: AuthenticatedSocket) => {
-      console.log(`🔌 Utilisateur connecté: ${socket.username} (${socket.userId})`);
       
       // Ajouter l'utilisateur aux utilisateurs connectés
       this.addConnectedUser(socket);
@@ -84,7 +82,6 @@ export class SocketService {
       
       // Gestion de la déconnexion
       socket.on('disconnect', () => {
-        console.log(`🔌 Utilisateur déconnecté: ${socket.username} (${socket.userId})`);
         this.removeConnectedUser(socket);
       });
     });
@@ -94,13 +91,11 @@ export class SocketService {
     // Événement pour rejoindre une conversation
     socket.on('join_conversation', (conversationId: number) => {
       socket.join(`conversation_${conversationId}`);
-      console.log(`👥 ${socket.username} a rejoint la conversation ${conversationId}`);
     });
 
     // Événement pour quitter une conversation
     socket.on('leave_conversation', (conversationId: number) => {
       socket.leave(`conversation_${conversationId}`);
-      console.log(`👥 ${socket.username} a quitté la conversation ${conversationId}`);
     });
 
     // Indicateur de frappe
@@ -132,7 +127,6 @@ export class SocketService {
         // Envoyer confirmation
         socket.emit('notification_marked_read', { notificationId });
       } catch (error) {
-        console.error('Erreur marquage notification:', error);
       }
     });
 
@@ -222,7 +216,6 @@ export class SocketService {
 
       return savedNotification;
     } catch (error) {
-      console.error('Erreur envoi notification:', error);
       throw error;
     }
   }
@@ -249,7 +242,6 @@ export class SocketService {
 
       return message;
     } catch (error) {
-      console.error('Erreur envoi message:', error);
       throw error;
     }
   }

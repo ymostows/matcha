@@ -111,7 +111,6 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       });
 
       newSocket.on('messages_read', (data: any) => {
-        console.log('👁️ Messages lus:', data);
         // Mettre à jour le compteur global
         updateUnreadMessageCount();
         
@@ -235,14 +234,12 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   const joinConversation = (conversationId: number) => {
     if (socket && isConnected) {
       socket.emit('join_conversation', conversationId);
-      console.log(`👥 Rejoint la conversation ${conversationId}`);
     }
   };
 
   const leaveConversation = (conversationId: number) => {
     if (socket && isConnected) {
       socket.emit('leave_conversation', conversationId);
-      console.log(`👥 Quitté la conversation ${conversationId}`);
     }
   };
 
