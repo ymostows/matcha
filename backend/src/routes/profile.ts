@@ -922,19 +922,27 @@ router.post('/like', authenticateToken, async (req: Request, res: Response): Pro
     const client = await pool.connect();
     let isMatch = false;
     try {
-      // Vérifier s'il existe déjà un match entre les deux utilisateurs
-      const existingMatchResult = await client.query(`
-        SELECT 1 FROM matches 
-        WHERE (user1_id = $1 AND user2_id = $2) OR (user1_id = $2 AND user2_id = $1)
-      `, [Math.min(userId, targetUserId), Math.max(userId, targetUserId)]);
+      // Vérifier s'il existe déjà un like de cet utilisateur vers la cible
+      const existingLikeResult = await client.query(`
+        SELECT is_like FROM likes 
+        WHERE liker_id = $1 AND liked_id = $2
+      `, [userId, targetUserId]);
 
-      if (existingMatchResult.rows.length > 0 && isLike) {
-        client.release();
-        res.status(400).json({ 
-          success: false, 
-          message: 'Vous êtes déjà en match avec cette personne. Utilisez la messagerie pour communiquer.' 
-        });
-        return;
+      // Si c'est un like et qu'il y a déjà un match, empêcher l'action
+      if (isLike) {
+        const existingMatchResult = await client.query(`
+          SELECT 1 FROM matches 
+          WHERE (user1_id = $1 AND user2_id = $2) OR (user1_id = $2 AND user2_id = $1)
+        `, [Math.min(userId, targetUserId), Math.max(userId, targetUserId)]);
+
+        if (existingMatchResult.rows.length > 0) {
+          client.release();
+          res.status(400).json({ 
+            success: false, 
+            message: 'Vous êtes déjà en match avec cette personne. Utilisez la messagerie pour communiquer.' 
+          });
+          return;
+        }
       }
 
       // Insérer ou mettre à jour le like
