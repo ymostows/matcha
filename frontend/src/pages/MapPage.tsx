@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MapPin, Users, Compass, Target } from 'lucide-react';
+import { MapPin, Target, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
@@ -34,23 +34,18 @@ const MapPage: React.FC = () => {
     const loadUserProfile = async () => {
       try {
         const profile = await profileApi.getMyProfile();
-        console.log('🎯 Profil utilisateur chargé:', profile);
         setUserProfile(profile);
         
         // Si l'utilisateur a des coordonnées dans son profil, centrer la carte dessus
         const lat = profile.location_lat || profile.latitude;
         const lng = profile.location_lng || profile.longitude;
-        console.log(`📍 Coordonnées utilisateur: lat=${lat}, lng=${lng}`);
         
         if (lat && lng) {
           setMapCenter({ lat, lng });
           setUserLocation({ lat, lng });
-          console.log(`🗺️ Carte centrée sur: lat=${lat}, lng=${lng}`);
-        } else {
-          console.log('⚠️ Aucune coordonnée trouvée dans le profil');
         }
       } catch (error) {
-        console.error('Erreur lors du chargement du profil:', error);
+        // Erreur silencieuse
       } finally {
         setIsLoadingProfile(false);
       }
@@ -64,40 +59,34 @@ const MapPage: React.FC = () => {
     if (userProfile) {
       loadAllUsersWithLocation();
     }
-  }, [userProfile]);
+  }, [userProfile]); // Retirer userLocation pour éviter les boucles infinies
 
   // Fonction pour charger TOUS les utilisateurs avec géolocalisation
   const loadAllUsersWithLocation = async () => {
+    // Éviter les rechargements multiples simultanés
+    if (isLoadingUsers) {
+      return;
+    }
+    
     setIsLoadingUsers(true);
     try {
-      console.log('🌍 Chargement de TOUS les utilisateurs avec géolocalisation...');
       
-      // Charger sans filtre de distance pour avoir tous les utilisateurs
+      // Charger tous les utilisateurs
       const users = await profileApi.browseProfiles({
-        sortBy: 'distance',
-        sortOrder: 'asc',
-        // Pas de maxDistance pour avoir TOUS les utilisateurs
+        sortBy: 'fame_rating',
+        sortOrder: 'desc',
         ageMin: 18,
         ageMax: 100
       });
 
-      console.log(`📊 API a retourné ${users.length} utilisateurs au total`);
-      
       // Filtrer seulement les utilisateurs qui ont des coordonnées
       const usersWithLocation = users.filter(user => {
         const lat = user.location_lat || user.latitude;
         const lng = user.location_lng || user.longitude;
-        const hasLocation = lat && lng && lat !== 0 && lng !== 0;
-        
-        if (hasLocation) {
-          console.log(`✅ Utilisateur ${user.first_name} ${user.last_name} (${user.city}): lat=${lat}, lng=${lng}, distance=${user.distance_km || 'N/A'}km`);
-        }
-        
-        return hasLocation;
+        return lat && lng && lat !== 0 && lng !== 0;
       }) as ProfileWithDistance[];
 
       setNearbyUsers(usersWithLocation);
-      console.log(`🗺️ Chargé ${usersWithLocation.length}/${users.length} utilisateurs avec géolocalisation valide`);
       
       // Centrer intelligemment la carte
       if (usersWithLocation.length > 0) {
@@ -108,7 +97,6 @@ const MapPage: React.FC = () => {
           // Si l'utilisateur a des coordonnées, centrer sur lui
           setMapCenter({ lat: userLat, lng: userLng });
           setUserLocation({ lat: userLat, lng: userLng });
-          console.log(`🎯 Carte centrée sur l'utilisateur: lat=${userLat}, lng=${userLng}`);
         } else {
           // Sinon, centrer sur le centre géographique des autres utilisateurs
           const avgLat = usersWithLocation.reduce((sum, u) => sum + (u.location_lat || u.latitude || 0), 0) / usersWithLocation.length;
@@ -116,61 +104,61 @@ const MapPage: React.FC = () => {
           
           if (avgLat && avgLng) {
             setMapCenter({ lat: avgLat, lng: avgLng });
-            console.log(`🎯 Carte centrée sur le centre des utilisateurs: lat=${avgLat.toFixed(3)}, lng=${avgLng.toFixed(3)}`);
           }
         }
       }
       
     } catch (error) {
-      console.error('❌ Erreur lors du chargement des utilisateurs:', error);
+      // Erreur silencieuse
     } finally {
-      setIsLoadingUsers(false);
+      // Petite pause pour éviter les rechargements trop rapides
+      setTimeout(() => {
+        setIsLoadingUsers(false);
+      }, 300);
     }
   };
 
   // Fonction pour obtenir la géolocalisation en temps réel
   const getUserLocation = () => {
+    // Éviter les clics multiples
+    if (isGettingLocation) {
+      return;
+    }
+    
     setIsGettingLocation(true);
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         async (position) => {
           const { latitude, longitude } = position.coords;
+          
           setUserLocation({ lat: latitude, lng: longitude });
           setMapCenter({ lat: latitude, lng: longitude });
           
-          // Optionnel : Mettre à jour la position dans le profil si elle diffère
-          const currentLat = userProfile?.location_lat || userProfile?.latitude;
-          const currentLng = userProfile?.location_lng || userProfile?.longitude;
-          if (userProfile && currentLat && currentLng &&
-              (Math.abs(currentLat - latitude) > 0.001 || 
-               Math.abs(currentLng - longitude) > 0.001)) {
-            try {
-              await profileApi.updateLocation(latitude, longitude);
-              console.log('Position mise à jour dans le profil');
-              
-              // Mettre à jour l'état local du profil utilisateur
-              setUserProfile(prev => prev ? {
-                ...prev,
-                latitude: latitude,
-                longitude: longitude,
-                location_lat: latitude,
-                location_lng: longitude
-              } : null);
-              
-              // Recharger les utilisateurs avec la nouvelle position
-              setTimeout(() => {
-                loadAllUsersWithLocation();
-              }, 500);
-              
-            } catch (error) {
-              console.error('Erreur lors de la mise à jour de la position:', error);
-            }
+          // Mettre à jour la position dans le profil
+          try {
+            await profileApi.updateLocation(latitude, longitude);
+            
+            // Mettre à jour l'état local du profil utilisateur
+            setUserProfile(prev => prev ? {
+              ...prev,
+              latitude: latitude,
+              longitude: longitude,
+              location_lat: latitude,
+              location_lng: longitude
+            } : null);
+            
+            // Attendre un peu puis recharger
+            setTimeout(() => {
+              loadAllUsersWithLocation();
+            }, 1000);
+            
+          } catch (error) {
+            // Erreur silencieuse
           }
           
           setIsGettingLocation(false);
         },
         (error) => {
-          console.error('Erreur géolocalisation:', error);
           let errorMessage = 'Erreur de géolocalisation';
           switch (error.code) {
             case error.PERMISSION_DENIED:
@@ -198,20 +186,15 @@ const MapPage: React.FC = () => {
     }
   };
 
-  // Fonction utilitaire pour formatter la distance
-  const formatDistance = (distanceKm: number): string => {
-    if (distanceKm < 1) {
-      return `${Math.round(distanceKm * 1000)}m`;
-    } else if (distanceKm < 10) {
-      return `${distanceKm.toFixed(1)}km`;
-    } else {
-      return `${Math.round(distanceKm)}km`;
-    }
-  };
+
 
   // Créer des icônes personnalisées pour les markers
   const createCustomIcon = (imageUrl: string, isCurrentUser: boolean = false) => {
     const size = isCurrentUser ? 40 : 30;
+    
+    // Si l'URL est un data URI (image générée), l'utiliser directement
+    const finalImageUrl = imageUrl.startsWith('data:') ? imageUrl : imageUrl;
+    
     const iconHtml = `
       <div style="
         width: ${size}px; 
@@ -223,8 +206,9 @@ const MapPage: React.FC = () => {
         display: flex;
         align-items: center;
         justify-content: center;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
       ">
-        <img src="${imageUrl}" style="
+        <img src="${finalImageUrl}" style="
           width: 100%; 
           height: 100%; 
           object-fit: cover;
@@ -253,7 +237,11 @@ const MapPage: React.FC = () => {
               ) : userProfile ? (
                 <div className="w-12 h-12 rounded-full overflow-hidden border-3 border-white shadow-lg ring-2 ring-primary/20">
                   <img
-                    src={getProfilePictureUrl(userProfile.photos || [])}
+                    src={getProfilePictureUrl(userProfile.photos || [], 'http://localhost:3001', {
+                      first_name: userProfile.first_name,
+                      last_name: userProfile.last_name,
+                      gender: userProfile.gender
+                    })}
                     alt={`${userProfile.first_name} ${userProfile.last_name}`}
                     className="w-full h-full object-cover"
                     onError={(e) => {
@@ -307,7 +295,7 @@ const MapPage: React.FC = () => {
             disabled={isLoadingUsers}
             className="flex items-center gap-2 bg-white text-primary px-4 py-2 rounded-lg hover:bg-primary/5 transition-colors disabled:opacity-50 border border-primary/20"
           >
-            <Compass className="w-4 h-4" />
+            <Target className="w-4 h-4" />
             {isLoadingUsers ? 'Actualisation...' : 'Actualiser la carte'}
           </button>
         </div>
@@ -327,22 +315,23 @@ const MapPage: React.FC = () => {
               />
               
               {/* Markers des autres utilisateurs */}
-              {nearbyUsers.map((user) => {
+                            {nearbyUsers.map((user) => {
                 const userLat = user.location_lat || user.latitude;
                 const userLng = user.location_lng || user.longitude;
-                
+
                 if (!userLat || !userLng) {
-                  console.log(`❌ Marker skipped for ${user.first_name}: no coordinates`);
                   return null;
                 }
-                
-                console.log(`📍 Marker Leaflet ${user.first_name}: lat=${userLat}, lng=${userLng}`);
                 
                 return (
                   <Marker
                     key={user.id}
                     position={[userLat, userLng]}
-                    icon={createCustomIcon(getProfilePictureUrl(user.photos || []), false)}
+                    icon={createCustomIcon(getProfilePictureUrl(user.photos || [], 'http://localhost:3001', {
+                      first_name: user.first_name,
+                      last_name: user.last_name,
+                      gender: user.gender
+                    }), false)}
                     eventHandlers={{
                       click: () => navigate(`/profile/${user.user_id}`)
                     }}
@@ -351,9 +340,7 @@ const MapPage: React.FC = () => {
                       <div className="text-center">
                         <div className="font-bold">{user.first_name} {user.last_name.charAt(0)}.</div>
                         {user.city && <div className="text-gray-600">{user.city}</div>}
-                        {user.distance_km && (
-                          <div className="text-blue-600 font-medium">{formatDistance(user.distance_km)}</div>
-                        )}
+                        {user.age && <div className="text-gray-500">{user.age} ans</div>}
                         <button
                           onClick={() => navigate(`/profile/${user.user_id}`)}
                           className="mt-2 bg-primary text-white px-3 py-1 rounded text-sm hover:bg-primary-dark transition-colors"
@@ -373,7 +360,11 @@ const MapPage: React.FC = () => {
                     userProfile.location_lat || userProfile.latitude!,
                     userProfile.location_lng || userProfile.longitude!
                   ]}
-                  icon={createCustomIcon(getProfilePictureUrl(userProfile.photos || []), true)}
+                  icon={createCustomIcon(getProfilePictureUrl(userProfile.photos || [], 'http://localhost:3001', {
+                    first_name: userProfile.first_name,
+                    last_name: userProfile.last_name,
+                    gender: userProfile.gender
+                  }), true)}
                 >
                   <Popup>
                     <div className="text-center">
@@ -385,97 +376,6 @@ const MapPage: React.FC = () => {
                 </Marker>
               )}
             </MapContainer>
-            
-            {/* Overlay avec infos utilisateur */}
-            <div className="absolute top-4 left-4 bg-white/95 backdrop-blur-sm rounded-lg shadow-lg p-4 max-w-xs z-[1000]">
-              <h3 className="font-semibold text-twilight mb-2 flex items-center gap-2">
-                <Compass className="w-4 h-4 text-primary" />
-                Ma position
-              </h3>
-              
-              {isLoadingProfile ? (
-                <div className="animate-pulse">
-                  <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                  <div className="h-3 bg-gray-200 rounded w-1/2"></div>
-                </div>
-              ) : userProfile ? (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full overflow-hidden border border-white shadow-sm">
-                      <img
-                        src={getProfilePictureUrl(userProfile.photos || [])}
-                        alt="Votre photo"
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          target.src = `/placeholder-avatar.svg`;
-                        }}
-                      />
-                    </div>
-                    <div>
-                      <div className="font-medium text-sm">{userProfile.first_name}</div>
-                      {userProfile.city && (
-                        <div className="text-xs text-gray-600">{userProfile.city}</div>
-                      )}
-                    </div>
-                  </div>
-                  
-                  {/* Position GPS */}
-                  {(userProfile.location_lat || userProfile.latitude) && (userProfile.location_lng || userProfile.longitude) ? (
-                    <div className="text-xs text-gray-600">
-                      📍 {(userProfile.location_lat || userProfile.latitude)?.toFixed(3)}, {(userProfile.location_lng || userProfile.longitude)?.toFixed(3)}
-                    </div>
-                  ) : (
-                    <div className="text-xs text-amber-600">
-                      ⚠️ Position non définie
-                    </div>
-                  )}
-                </div>
-              ) : null}
-              
-              {/* Bouton géolocalisation */}
-              <button
-                onClick={getUserLocation}
-                disabled={isGettingLocation}
-                className="mt-3 w-full bg-primary hover:bg-primary-dark text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                {isGettingLocation ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    Localisation...
-                  </>
-                ) : (
-                  <>
-                    <Target className="w-4 h-4" />
-                    Ma position
-                  </>
-                )}
-              </button>
-              
-              {/* Debug info */}
-              {userLocation && (
-                <p className="text-xs text-gray-500 mt-2">
-                  Position actuelle: {userLocation.lat.toFixed(4)}, {userLocation.lng.toFixed(4)}
-                </p>
-              )}
-            </div>
-
-            {/* Overlay compteur utilisateurs */}
-            <div className="absolute top-4 right-4 bg-white/95 backdrop-blur-sm rounded-lg shadow-lg p-3 z-[1000]">
-              <div className="flex items-center gap-2 mb-2">
-                <Users className="w-4 h-4 text-primary" />
-                <span className="text-sm font-medium text-twilight">
-                  {nearbyUsers.length} utilisateurs
-                </span>
-              </div>
-              <div className="text-xs text-gray-600">
-                <div>Centre: {mapCenter.lat.toFixed(3)}, {mapCenter.lng.toFixed(3)}</div>
-                <div>Zoom: {mapZoom}</div>
-              </div>
-              <div className="text-xs text-green-600 font-bold mt-1">
-                ✅ Navigation souris + markers synchronisés !
-              </div>
-            </div>
           </div>
         </div>
 
@@ -504,7 +404,11 @@ const MapPage: React.FC = () => {
                     <div className="relative">
                       <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-white shadow-sm">
                         <img
-                          src={getProfilePictureUrl(user.photos || [])}
+                          src={getProfilePictureUrl(user.photos || [], 'http://localhost:3001', {
+                            first_name: user.first_name,
+                            last_name: user.last_name,
+                            gender: user.gender
+                          })}
                           alt={`${user.first_name} ${user.last_name}`}
                           className="w-full h-full object-cover"
                           onError={(e) => {
@@ -521,11 +425,15 @@ const MapPage: React.FC = () => {
                         {user.first_name} {user.last_name.charAt(0)}.
                       </h4>
                       <div className="flex items-center gap-2 text-sm text-twilight/60">
-                        <MapPin className="w-3 h-3" />
-                        <span>{user.distance_km ? formatDistance(user.distance_km) : 'Distance inconnue'}</span>
+                        {user.city && (
+                          <>
+                            <MapPin className="w-3 h-3" />
+                            <span>{user.city}</span>
+                          </>
+                        )}
                         {user.age && (
                           <>
-                            <span>•</span>
+                            {user.city && <span>•</span>}
                             <span>{user.age} ans</span>
                           </>
                         )}
@@ -562,30 +470,7 @@ const MapPage: React.FC = () => {
           )}
         </div>
 
-        {/* Info card */}
-        <div className="mt-6 bg-green-50 border border-green-200 rounded-lg p-4">
-          <div className="flex items-start">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-green-800">
-                Carte interactive complète ! 🎉
-              </h3>
-              <div className="mt-1 text-sm text-green-700">
-                <ul className="space-y-1">
-                  <li>✅ <strong>Tous les utilisateurs</strong> avec géolocalisation affichés</li>
-                  <li>✅ <strong>Markers visuels</strong> avec photos de profil sur la carte</li>
-                  <li>✅ <strong>Tooltips informatifs</strong> au survol des markers</li>
-                  <li>✅ <strong>Navigation directe</strong> vers les profils en cliquant</li>
-                  <li>✅ <strong>Centre automatique</strong> sur la zone des utilisateurs</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
+
       </div>
     </div>
   );

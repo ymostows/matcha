@@ -158,7 +158,11 @@ export const UserDashboard: React.FC = () => {
                 <div className="w-20 h-20 rounded-full shadow-2xl relative overflow-hidden border-3 border-white/50">
                   {userProfile?.photos && userProfile.photos.length > 0 ? (
                     <img 
-                      src={getProfilePictureUrl(userProfile.photos)}
+                      src={getProfilePictureUrl(userProfile.photos, 'http://localhost:3001', {
+                        first_name: userProfile.first_name,
+                        last_name: userProfile.last_name,
+                        gender: userProfile.gender
+                      })}
                       alt="Profile"
                       className="w-full h-full object-cover"
                       onError={(e) => {

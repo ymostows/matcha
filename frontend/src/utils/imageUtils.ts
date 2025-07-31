@@ -4,8 +4,13 @@ export function getPhotoUrl(photoId: number | string, baseUrl: string = 'http://
 }
 
 // Fonction pour obtenir la photo de profil principale avec fallback amélioré
-export function getProfilePictureUrl(photos: any[], baseUrl: string = 'http://localhost:3001'): string {
+export function getProfilePictureUrl(photos: any[], baseUrl: string = 'http://localhost:3001', userInfo?: { first_name?: string; last_name?: string; gender?: string }): string {
   if (!photos || photos.length === 0) {
+    // Si on a les infos utilisateur, générer une image avec initiales
+    if (userInfo?.first_name) {
+      const fullName = `${userInfo.first_name} ${userInfo.last_name || ''}`.trim();
+      return getPlaceholderImage(fullName, userInfo.gender);
+    }
     return '/placeholder-avatar.svg'; // Image par défaut
   }
   
@@ -21,7 +26,11 @@ export function getProfilePictureUrl(photos: any[], baseUrl: string = 'http://lo
     return getPhotoUrl(firstPhotoWithId.id, baseUrl);
   }
   
-  // Fallback final
+  // Fallback final avec initiales si possible
+  if (userInfo?.first_name) {
+    const fullName = `${userInfo.first_name} ${userInfo.last_name || ''}`.trim();
+    return getPlaceholderImage(fullName, userInfo.gender);
+  }
   return '/placeholder-avatar.svg';
 }
 
