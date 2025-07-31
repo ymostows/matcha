@@ -11,6 +11,9 @@ COPY package*.json ./
 # Installer les dépendances
 RUN npm install
 
+# Forcer l'installation des packages Leaflet (pour éviter les problèmes de volumes Docker)
+RUN npm install leaflet react-leaflet @types/leaflet --save
+
 # Copier le code source
 COPY . .
 
@@ -29,5 +32,5 @@ EXPOSE 5173
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:5173 || exit 1
 
-# Commande de développement avec host 0.0.0.0 pour Docker
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"] 
+# Commande de développement avec installation Leaflet automatique
+CMD ["sh", "-c", "npm list leaflet > /dev/null 2>&1 || (echo '📦 Installation de Leaflet...' && npm install leaflet react-leaflet @types/leaflet); echo '🚀 Démarrage du serveur Vite...'; npm run dev -- --host 0.0.0.0 --port 5173"] 

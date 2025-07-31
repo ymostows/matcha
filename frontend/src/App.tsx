@@ -17,6 +17,7 @@ import { ProfilePublicPage } from './pages/ProfilePublicPage';
 import BrowsingPage from './pages/BrowsingPage';
 import ChatPage from './pages/ChatPage';
 import ConversationsPage from './pages/ConversationsPage';
+import MapPage from './pages/MapPage';
 import { Header } from './components/layout/Header';
 // import { NotificationDebug } from './components/debug/NotificationDebug';
 // import { ToastContainer } from 'react-toastify';
@@ -145,6 +146,15 @@ const AppContent: React.FC = () => {
         <ProtectedRoute requireCompleteProfile={true}>
           <AppLayout>
             <BrowsingPage />
+          </AppLayout>
+        </ProtectedRoute>
+      } />
+      
+      {/* Routes protégées - Carte */}
+      <Route path="/map" element={
+        <ProtectedRoute requireCompleteProfile={true}>
+          <AppLayout>
+            <MapPage />
           </AppLayout>
         </ProtectedRoute>
       } />

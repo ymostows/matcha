@@ -9,6 +9,9 @@ export interface ProfileData {
   city?: string;
   latitude?: number;
   longitude?: number;
+  // Champs de géolocalisation de la DB
+  location_lat?: number;
+  location_lng?: number;
 }
 
 export interface CompleteProfile extends ProfileData {
@@ -29,6 +32,8 @@ export interface CompleteProfile extends ProfileData {
   first_name: string;
   last_name: string;
   last_seen: string;
+  // Distance calculée par l'API (pour browse)
+  distance_km?: number;
 }
 
 export interface LikeHistoryItem {

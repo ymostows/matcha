@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '../ui/button';
-import { Heart, User, Home, LogOut, Search, Menu, X, MessageCircle } from 'lucide-react';
+import { Heart, User, Home, LogOut, Search, Menu, X, MessageCircle, MapPin } from 'lucide-react';
 import { NotificationBell } from '../notifications/NotificationBell';
 import { useSocket } from '../../contexts/SocketContext';
 
@@ -30,6 +30,7 @@ export const Header: React.FC = () => {
   const navLinks = [
     { path: '/dashboard', label: 'Accueil', icon: Home },
     { path: '/browsing', label: 'Découverte', icon: Search },
+    { path: '/map', label: 'Carte', icon: MapPin },
     { path: '/conversations', label: 'Messages', icon: MessageCircle },
     { path: '/profile', label: 'Mon profil', icon: User },
   ];
