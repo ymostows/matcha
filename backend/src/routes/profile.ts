@@ -473,19 +473,19 @@ router.get('/browse', authenticateToken, async (req: Request, res: Response): Pr
 
     if (Array.isArray(commonTags) && commonTags.length > 0) {
       // Logique d'inclusion : afficher seulement les profils qui ont TOUS ces intérêts
-      // Nettoyer les tags côté serveur avant de les utiliser dans la requête
-      const cleanedTags = commonTags.map(tag => tag.replace(/[^\w\s]/g, '').trim());
+      // Garder les tags originaux avec émojis pour un matching plus précis
+      const normalizedTags = commonTags.map(tag => tag.trim());
       
-      const tagConditions = cleanedTags.map((cleanedTag, index) => {
+      const tagConditions = normalizedTags.map((tag, index) => {
         const currentParamIndex = paramIndex + index;
         return `EXISTS (
           SELECT 1 FROM unnest(p.interests) AS interest 
-          WHERE LOWER(regexp_replace(interest, '[^\\w\\s]', '', 'g')) LIKE LOWER('%' || $${currentParamIndex} || '%')
+          WHERE LOWER(interest) LIKE LOWER('%' || $${currentParamIndex} || '%')
         )`;
       });
       query += ` AND (${tagConditions.join(' AND ')})`;
-      params.push(...cleanedTags);
-      paramIndex += cleanedTags.length;
+      params.push(...normalizedTags);
+      paramIndex += normalizedTags.length;
     }
 
     // Ajouter le filtre d'inclusion par villes spécifiques
@@ -562,11 +562,11 @@ router.get('/browse', authenticateToken, async (req: Request, res: Response): Pr
           isCitiesArray: Array.isArray(req.query.cities)
         }
       });
-      const cleanedTagsForDebug = commonTags.map(tag => tag.replace(/[^\w\s]/g, '').trim());
+      const normalizedTagsForDebug = commonTags.map(tag => tag.trim());
       console.log('✅ PROCESSED ARRAYS:', {
         commonTagsLength: commonTags.length,
         commonTagsContent: commonTags,
-        cleanedTagsContent: cleanedTagsForDebug,
+        normalizedTagsContent: normalizedTagsForDebug,
         citiesLength: cities.length,
         citiesContent: cities
       });
