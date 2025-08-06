@@ -280,7 +280,7 @@ const MapPage: React.FC = () => {
             className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
           >
             <Target className="w-4 h-4" />
-            {isGettingLocation ? 'Localisation...' : 'Ma position'}
+            {isGettingLocation ? 'Localisation...' : 'Actualiser la carte'}
           </button>
           
           <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-lg shadow-sm">
@@ -290,14 +290,7 @@ const MapPage: React.FC = () => {
             </span>
           </div>
 
-          <button
-            onClick={() => loadAllUsersWithLocation()}
-            disabled={isLoadingUsers}
-            className="flex items-center gap-2 bg-white text-primary px-4 py-2 rounded-lg hover:bg-primary/5 transition-colors disabled:opacity-50 border border-primary/20"
-          >
-            <Target className="w-4 h-4" />
-            {isLoadingUsers ? 'Actualisation...' : 'Actualiser la carte'}
-          </button>
+          
         </div>
 
         {/* Carte Leaflet avec markers géolocalisés */}

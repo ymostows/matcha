@@ -329,11 +329,11 @@ const ChatPage: React.FC = () => {
         <div className="mb-6">
           <Button
             variant="outline"
-            onClick={() => navigate('/dashboard')}
+            onClick={() => navigate('/conversations')}
             className="mb-4"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Retour au dashboard
+            Retour aux conversations
           </Button>
         </div>
           <Card className="h-[600px] flex flex-col overflow-hidden">
