@@ -112,7 +112,16 @@ const ConversationsList: React.FC<ConversationsListProps> = ({ className = '' })
         console.error('Erreur marquage messages lus:', error);
       }
     }
-    navigate(`/chat/${conversation.id}`);
+    
+    // Naviguer en passant les informations de l'utilisateur via le state
+    // Cela permet au ChatPage de récupérer le nom même si l'API échoue (navigation privée)
+    navigate(`/chat/${conversation.id}`, {
+      state: {
+        userName: conversation.other_user_name,
+        userId: conversation.other_user_id,
+        conversationId: conversation.id
+      }
+    });
   };
 
   const formatLastMessageTime = (dateString: string) => {

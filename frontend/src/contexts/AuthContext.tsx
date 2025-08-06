@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import type { User, AuthContextType, RegisterData } from '../types/auth';
 import apiService from '../services/api';
 import { profileApi } from '../services/profileApi';
+import storageManager from '../utils/storageManager';
 
 // Création du contexte
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -31,19 +32,48 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setIsLoading(true);
         setError(null);
 
-        const savedToken = localStorage.getItem('token');
-        const savedUser = apiService.getCurrentUser();
+        // Utiliser le storageManager robuste au lieu de localStorage direct
+        const savedToken = storageManager.getItem('token');
+        const savedUserData = storageManager.getObject<User>('user');
 
-        if (savedToken && savedUser) {
-          // Restaurer la session depuis le localStorage
+        if (savedToken && savedUserData) {
+          // Restaurer la session depuis le stockage
           setToken(savedToken);
-          setUser(savedUser);
+          setUser(savedUserData);
+          
+          // Informer apiService du token restauré
+          apiService.setAuthToken(savedToken);
+          
+          // Vérifier que le token est toujours valide
+          try {
+            const profileData = await profileApi.getMyProfile();
+            const updatedUser = {
+              ...savedUserData,
+              ...profileData,
+            };
+            setUser(updatedUser);
+            storageManager.setObject('user', updatedUser);
+          } catch (tokenError) {
+            console.warn('Token invalide, déconnexion:', tokenError);
+            // Token invalide, nettoyer la session
+            apiService.logout();
+            storageManager.removeItem('token');
+            storageManager.removeItem('user');
+            setToken(null);
+            setUser(null);
+          }
         } else {
+          // Pas de session sauvegardée
+          console.log('Aucune session trouvée');
         }
       } catch (error) {
+        console.error('Erreur lors de l\'initialisation:', error);
         setError('Erreur lors de l\'initialisation');
-        // En cas d'erreur, nettoyer
+        
+        // En cas d'erreur, nettoyer complètement
         apiService.logout();
+        storageManager.removeItem('token');
+        storageManager.removeItem('user');
         setToken(null);
         setUser(null);
       } finally {
@@ -76,10 +106,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             ...profileData,
           };
           setUser(updatedUser);
-          localStorage.setItem('user', JSON.stringify(updatedUser));
+          
+          // Sauvegarder avec le storageManager robuste
+          const savedSuccessfully = storageManager.setObject('user', updatedUser);
+          if (!savedSuccessfully) {
+            console.warn('Impossible de sauvegarder les données utilisateur');
+            // Afficher une notification à l'utilisateur si nécessaire
+          }
         } catch (profileError) {
           // En cas d'erreur, continuer avec les données utilisateur de base
           console.warn('Impossible de charger les données du profil:', profileError);
+          
+          // Sauvegarder au moins les données de base
+          const savedSuccessfully = storageManager.setObject('user', response.user);
+          if (!savedSuccessfully) {
+            console.warn('Impossible de sauvegarder même les données utilisateur de base');
+          }
         }
       } else {
         throw new Error(response.message || 'Erreur de connexion');
@@ -142,7 +184,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       };
 
       setUser(updatedUser);
-      localStorage.setItem('user', JSON.stringify(updatedUser));
+      
+      // Sauvegarder avec le storageManager robuste
+      const savedSuccessfully = storageManager.setObject('user', updatedUser);
+      if (!savedSuccessfully) {
+        console.warn('Impossible de sauvegarder les données utilisateur mises à jour');
+      }
     } catch (error) {
     }
   }, [user]);

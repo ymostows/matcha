@@ -1,13 +1,17 @@
 import type { AuthResponse, LoginData, RegisterData, User } from '../types/auth';
+import storageManager from '../utils/storageManager';
 
 // Configuration de base de l'API
 export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 class ApiService {
   private baseURL: string;
+  private authToken: string | null = null;
 
   constructor() {
     this.baseURL = API_BASE_URL;
+    // Initialiser le token depuis le stockage
+    this.authToken = storageManager.getItem('token');
   }
 
   // Méthode privée pour faire les requêtes HTTP
@@ -26,9 +30,13 @@ class ApiService {
     }
 
     // Ajouter le token JWT si disponible
-    const token = localStorage.getItem('token');
+    const token = this.authToken || storageManager.getItem('token');
     if (token) {
       defaultHeaders.Authorization = `Bearer ${token}`;
+      // Mettre à jour le token en cache s'il a changé
+      if (this.authToken !== token) {
+        this.authToken = token;
+      }
     }
 
     const config: RequestInit = {
@@ -74,10 +82,20 @@ class ApiService {
       body: JSON.stringify(credentials),
     });
 
-    // Sauvegarder le token en localStorage si la connexion réussit
+    // Sauvegarder le token avec le storageManager si la connexion réussit
     if (response.success && response.token) {
-      localStorage.setItem('token', response.token);
-      localStorage.setItem('user', JSON.stringify(response.user));
+      const tokenSaved = storageManager.setItem('token', response.token);
+      const userSaved = storageManager.setObject('user', response.user);
+      
+      if (tokenSaved) {
+        this.authToken = response.token;
+      } else {
+        console.warn('Impossible de sauvegarder le token d\'authentification');
+      }
+      
+      if (!userSaved) {
+        console.warn('Impossible de sauvegarder les données utilisateur');
+      }
     }
 
     return response;
@@ -94,15 +112,16 @@ class ApiService {
    * Déconnexion (côté client)
    */
   logout(): void {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    storageManager.removeItem('token');
+    storageManager.removeItem('user');
+    this.authToken = null;
   }
 
   /**
    * Vérifier si l'utilisateur est connecté
    */
   isAuthenticated(): boolean {
-    const token = localStorage.getItem('token');
+    const token = this.authToken || storageManager.getItem('token');
     return !!token;
   }
 
@@ -110,15 +129,12 @@ class ApiService {
    * Récupérer l'utilisateur stocké localement
    */
   getCurrentUser(): User | null {
-    const userStr = localStorage.getItem('user');
-    if (userStr) {
-      try {
-        return JSON.parse(userStr);
-      } catch {
-        return null;
-      }
+    try {
+      return storageManager.getObject<User>('user');
+    } catch (error) {
+      console.warn('Erreur lors de la récupération des données utilisateur:', error);
+      return null;
     }
-    return null;
   }
 
   /**
@@ -195,6 +211,32 @@ class ApiService {
 
   async delete<T>(endpoint: string): Promise<T> {
     return this.request<T>(endpoint, { method: 'DELETE' });
+  }
+
+  /**
+   * Définir le token d'authentification manuellement
+   */
+  setAuthToken(token: string): void {
+    this.authToken = token;
+    storageManager.setItem('token', token);
+  }
+
+  /**
+   * Obtenir le token d'authentification actuel
+   */
+  getAuthToken(): string | null {
+    return this.authToken || storageManager.getItem('token');
+  }
+
+  /**
+   * Vérifier si le stockage fonctionne correctement
+   */
+  getStorageStatus(): { working: boolean; type: string; limitations: any } {
+    return {
+      working: storageManager.isWorking(),
+      type: storageManager.getActiveStorageType(),
+      limitations: storageManager.getLimitations()
+    };
   }
 }
 

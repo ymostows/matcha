@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { MessageCircle, ArrowLeft, Send, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -9,10 +9,12 @@ import { chatApi, Message } from '../services/chatApi';
 import { useToast } from '../hooks/useToast';
 import { useSocket } from '../contexts/SocketContext';
 import { useAuth } from '../contexts/AuthContext';
+import storageManager from '../utils/storageManager';
 
 const ChatPage: React.FC = () => {
   const { conversationId } = useParams<{ conversationId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { error: errorToast } = useToast();
   const { user } = useAuth();
   const { 
@@ -34,6 +36,7 @@ const ChatPage: React.FC = () => {
   const [isSending, setIsSending] = useState(false);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [otherUser, setOtherUser] = useState<{ id: number; name: string } | null>(null);
+  const [conversationTitle, setConversationTitle] = useState<string>('Conversation');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -41,6 +44,8 @@ const ChatPage: React.FC = () => {
 
   useEffect(() => {
     if (conversationId) {
+      // Essayer de récupérer le nom depuis le stockage local d'abord
+      loadCachedConversationInfo();
       loadMessages();
     }
   }, [conversationId]);
@@ -203,6 +208,51 @@ const ChatPage: React.FC = () => {
     };
   }, []);
 
+  // Récupérer les infos de conversation depuis plusieurs sources
+  const loadCachedConversationInfo = () => {
+    // 1. Essayer de récupérer depuis le state de navigation (priorité la plus haute)
+    const navigationState = location.state as any;
+    if (navigationState?.userName && navigationState?.userId) {
+      const userData = {
+        id: navigationState.userId,
+        name: navigationState.userName
+      };
+      setOtherUser(userData);
+      setConversationTitle(navigationState.userName);
+      
+      // Mettre en cache ces infos pour les prochaines visites
+      cacheConversationInfo(userData.id, userData.name, userData.name);
+      console.log('Infos conversation récupérées depuis la navigation:', userData);
+      return;
+    }
+    
+    // 2. Fallback: essayer de récupérer depuis le cache
+    try {
+      const cachedKey = `conversation_${conversationId}`;
+      const cachedInfo = storageManager.getObject<{ id: number; name: string; title: string }>(cachedKey);
+      
+      if (cachedInfo) {
+        setOtherUser({ id: cachedInfo.id, name: cachedInfo.name });
+        setConversationTitle(cachedInfo.title || cachedInfo.name);
+        console.log('Infos conversation récupérées depuis le cache:', cachedInfo);
+      }
+    } catch (error) {
+      console.warn('Impossible de récupérer les infos de conversation depuis le cache:', error);
+    }
+  };
+
+  // Mettre en cache les infos de conversation
+  const cacheConversationInfo = (id: number, name: string, title: string) => {
+    try {
+      const cachedKey = `conversation_${conversationId}`;
+      const info = { id, name, title };
+      storageManager.setObject(cachedKey, info);
+      console.log('Infos conversation mises en cache:', info);
+    } catch (error) {
+      console.warn('Impossible de mettre en cache les infos de conversation:', error);
+    }
+  };
+
   const loadMessages = async () => {
     try {
       setIsLoading(true);
@@ -213,25 +263,50 @@ const ChatPage: React.FC = () => {
       if (fetchedMessages.length > 0 && user) {
         const otherUserMessage = fetchedMessages.find(m => m.sender_id !== user.id);
         if (otherUserMessage) {
-          setOtherUser({
+          const userData = {
             id: otherUserMessage.sender_id,
             name: otherUserMessage.sender_name
-          });
+          };
+          
+          setOtherUser(userData);
+          setConversationTitle(otherUserMessage.sender_name);
+          
+          // Mettre en cache pour la navigation privée
+          cacheConversationInfo(userData.id, userData.name, userData.name);
         }
       } else {
         // Si pas de messages, récupérer depuis les conversations
-        const conversations = await chatApi.getConversations();
-        const currentConv = conversations.find(c => c.id === parseInt(conversationId!));
-        if (currentConv) {
-          setOtherUser({
-            id: currentConv.other_user_id,
-            name: currentConv.other_user_name
-          });
+        try {
+          const conversations = await chatApi.getConversations();
+          const currentConv = conversations.find(c => c.id === parseInt(conversationId!));
+          if (currentConv) {
+            const userData = {
+              id: currentConv.other_user_id,
+              name: currentConv.other_user_name
+            };
+            
+            setOtherUser(userData);
+            setConversationTitle(currentConv.other_user_name);
+            
+            // Mettre en cache
+            cacheConversationInfo(userData.id, userData.name, userData.name);
+          }
+        } catch (convError) {
+          console.warn('Impossible de récupérer les conversations:', convError);
+          // Si même les conversations échouent, garder les infos du cache si disponibles
+          if (!otherUser) {
+            setConversationTitle('Utilisateur');
+          }
         }
       }
     } catch (error) {
       console.error('Erreur lors du chargement des messages:', error);
       errorToast('Impossible de charger les messages');
+      
+      // En cas d'erreur, si on n'a pas d'infos, utiliser un titre générique
+      if (!otherUser && conversationTitle === 'Conversation') {
+        setConversationTitle('Chat privé');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -301,7 +376,7 @@ const ChatPage: React.FC = () => {
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       sendMessage();
@@ -352,7 +427,7 @@ const ChatPage: React.FC = () => {
                     )}
                   </div>
                 ) : (
-                  'Conversation'
+                  <span className="truncate">{conversationTitle}</span>
                 )}
               </div>
               {isConnected ? (
@@ -453,7 +528,7 @@ const ChatPage: React.FC = () => {
                 <Input
                   value={newMessage}
                   onChange={(e) => handleTyping(e.target.value)}
-                  onKeyPress={handleKeyPress}
+                  onKeyDown={handleKeyDown}
                   placeholder="Tapez votre message..."
                   className="flex-1"
                   disabled={isSending}

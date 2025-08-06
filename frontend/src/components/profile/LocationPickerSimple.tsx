@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { MapPin, Navigation, Globe, Loader2 } from 'lucide-react';
+import { MapPin, Navigation, Globe, Loader2, AlertTriangle } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
-import { Label } from '../ui/label';
+import geolocationManager, { LocationData as GeoLocationData } from '../../utils/geolocationManager';
+import storageManager from '../../utils/storageManager';
 
 interface LocationPickerSimpleProps {
   initialLocation?: {
@@ -21,15 +22,8 @@ interface LocationPickerSimpleProps {
   className?: string;
 }
 
-interface LocationData {
-  latitude: number;
-  longitude: number;
-  city: string;
-  publicCity?: string;
-  method: 'gps' | 'ip' | 'manual';
-  precision: 'high' | 'medium' | 'low';
-  accuracy?: string; // Description textuelle de la précision
-}
+// Utiliser le type LocationData du geolocationManager
+type LocationData = GeoLocationData;
 
 export const LocationPickerSimple: React.FC<LocationPickerSimpleProps> = ({
   initialLocation,
@@ -42,9 +36,10 @@ export const LocationPickerSimple: React.FC<LocationPickerSimpleProps> = ({
       longitude: initialLocation.longitude,
       city: initialLocation.city || '',
       publicCity: initialLocation.publicCity,
-      method: 'manual',
-      precision: 'medium',
-      accuracy: 'Localisation précédente'
+      method: 'manual' as const,
+      precision: 'medium' as const,
+      accuracy: 'Localisation précédente',
+      timestamp: Date.now()
     } : null
   );
   const [manualCity, setManualCity] = useState(initialLocation?.city || '');
@@ -78,176 +73,52 @@ export const LocationPickerSimple: React.FC<LocationPickerSimpleProps> = ({
   // L'utilisateur doit décider lui-même d'utiliser la géolocalisation
 
 
-  // Détection GPS simplifiée (basée sur le test qui fonctionne)
-  const detectGPSLocation = () => {
-    if (!navigator.geolocation) {
-      setError("Votre navigateur ne supporte pas la géolocalisation.");
-      return;
-    }
-
+  // Détection GPS avec le nouveau GeolocationManager
+  const detectGPSLocation = async () => {
     setIsDetecting('gps');
     setError(null);
 
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude, accuracy } = position.coords;
-        
-        // Déterminer la précision basée sur l'accuracy GPS
-        let precision: 'high' | 'medium' | 'low' = 'medium';
-        let accuracyDescription = '';
-        
-        if (accuracy <= 10) {
-          precision = 'high';
-          accuracyDescription = `Très précise (±${Math.round(accuracy)}m)`;
-        } else if (accuracy <= 100) {
-          precision = 'medium';
-          accuracyDescription = `Précise (±${Math.round(accuracy)}m)`;
-        } else {
-          precision = 'low';
-          accuracyDescription = `Approximative (±${Math.round(accuracy)}m)`;
-        }
-        
-        // Essayer de géocoder les coordonnées pour obtenir un nom de ville
-        let cityName = `Position GPS (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`;
-        let publicCity = `Localisation précise`;
-        
-        try {
-          // Utiliser l'API de géocodage inversé gratuite
-          const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10`);
-          const data = await response.json();
-          
-          if (data.address) {
-            const address = data.address;
-            const city = address.city || address.town || address.village || address.municipality;
-            const country = address.country;
-            
-            if (city && country) {
-              cityName = `${city}, ${country}`;
-              publicCity = `${city}, ${country}`;
-            }
-          }
-        } catch (error) {
-          console.warn('Géocodage GPS échoué:', error);
-        }
-        
-        setLocation({
-          latitude,
-          longitude,
-          city: cityName,
-          publicCity,
-          method: 'gps',
-          precision,
-          accuracy: accuracyDescription
-        });
-        setManualCity(cityName);
-        setIsDetecting(false);
-      },
-      (error) => {
-        setIsDetecting(false);
-        
-        if (error.code === 1) {
-          setError("Permission refusée. Cliquez sur l'icône 🔒 dans la barre d'adresse pour autoriser la géolocalisation.");
-        } else if (error.code === 2) {
-          setError("Position indisponible. Vérifiez votre connexion.");
-        } else if (error.code === 3) {
-          setError("Délai d'attente dépassé. Réessayez.");
-        } else {
-          setError("Erreur de géolocalisation. Essayez une autre méthode.");
-        }
-      },
-      {
+    try {
+      const gpsLocation = await geolocationManager.requestLocation({
         enableHighAccuracy: false,
-        timeout: 10000,
-        maximumAge: 0
-      }
-    );
+        timeout: 15000,
+        maximumAge: 300000,
+        fallbackToIP: false // On gère le fallback manuellement
+      });
+
+      setLocation(gpsLocation);
+      setManualCity(gpsLocation.city);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Erreur de géolocalisation';
+      setError(errorMessage);
+    } finally {
+      setIsDetecting(false);
+    }
   };
 
-  // Détection par IP améliorée
+  // Détection par IP avec le GeolocationManager
   const detectIPLocation = async () => {
     setIsDetecting('ip');
     setError(null);
 
     try {
-      // Essayer plusieurs services IP en fallback
-      let data = null;
-      
-      // Service 1: ipapi.co (HTTPS)
-      try {
-        const response = await fetch('https://ipapi.co/json/');
-        data = await response.json();
-        if (data.latitude && data.longitude) {
-          const cityName = `${data.city}, ${data.country_name}`;
-          setLocation({
-            latitude: data.latitude,
-            longitude: data.longitude,
-            city: cityName,
-            publicCity: `Près de ${data.city}, ${data.country_name}`,
-            method: 'ip',
-            precision: 'low',
-            accuracy: 'Basée sur votre adresse IP (~5-10km)'
-          });
-          setManualCity(cityName);
-          setIsDetecting(false);
-          return;
-        }
-      } catch {
-        // Fallback au service 2
+      const ipLocation = await geolocationManager.requestLocation({
+        fallbackToIP: true,
+        defaultCity: 'Paris, France',
+        defaultCoordinates: { lat: 48.8566, lng: 2.3522 }
+      });
+
+      // Forcer le type à IP même si c'est un fallback par défaut
+      if (ipLocation.method === 'default') {
+        ipLocation.method = 'ip';
+        ipLocation.accuracy = 'Position par défaut (services IP indisponibles)';
       }
-      
-      // Service 2: ip-api.com (HTTP, mais plus fiable)
-      try {
-        const response = await fetch('http://ip-api.com/json/');
-        data = await response.json();
-        if (data.status === 'success' && data.lat && data.lon) {
-          const cityName = `${data.city}, ${data.country}`;
-          setLocation({
-            latitude: data.lat,
-            longitude: data.lon,
-            city: cityName,
-            publicCity: `Près de ${data.city}, ${data.country}`,
-            method: 'ip',
-            precision: 'low',
-            accuracy: 'Basée sur votre adresse IP (~5-10km)'
-          });
-          setManualCity(cityName);
-          setIsDetecting(false);
-          return;
-        }
-      } catch {
-        // Fallback au service 3
-      }
-      
-      // Service 3: ipify + ipapi fallback
-      try {
-        const ipResponse = await fetch('https://api.ipify.org?format=json');
-        const ipData = await ipResponse.json();
-        const geoResponse = await fetch(`https://ipapi.co/${ipData.ip}/json/`);
-        const geoData = await geoResponse.json();
-        
-        if (geoData.latitude && geoData.longitude) {
-          const cityName = `${geoData.city}, ${geoData.country_name}`;
-          setLocation({
-            latitude: geoData.latitude,
-            longitude: geoData.longitude,
-            city: cityName,
-            publicCity: `Près de ${geoData.city}, ${geoData.country_name}`,
-            method: 'ip',
-            precision: 'low',
-            accuracy: 'Basée sur votre adresse IP (~5-10km)'
-          });
-          setManualCity(cityName);
-          setIsDetecting(false);
-          return;
-        }
-      } catch {
-        // Tous les services ont échoué
-      }
-      
-      throw new Error('Tous les services de géolocalisation IP ont échoué');
-      
-    } catch {
-      setError("Impossible de déterminer votre position par IP. Utilisez le GPS ou saisissez votre ville manuellement.");
+
+      setLocation(ipLocation);
+      setManualCity(ipLocation.city);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Erreur de géolocalisation IP';
+      setError(errorMessage);
     } finally {
       setIsDetecting(false);
     }
@@ -265,72 +136,47 @@ export const LocationPickerSimple: React.FC<LocationPickerSimpleProps> = ({
 
     const cleanCity = city.trim();
     
-    // Essayer de géolocaliser automatiquement la ville saisie
     try {
       setStatus(`Recherche de la localisation de "${cleanCity}"...`);
       
-      // Appeler notre API backend pour géolocaliser la ville
-      const response = await fetch('/api/profile/geocode-city', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({ cityName: cleanCity })
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success && data.coordinates) {
-          // On a trouvé des coordonnées pour cette ville
-          setLocation({
-            latitude: data.coordinates.latitude,
-            longitude: data.coordinates.longitude,
-            city: cleanCity,
-            publicCity: data.formattedName || cleanCity,
-            method: 'manual',
-            precision: data.precision || 'medium',
-            accuracy: `Géolocalisée automatiquement`
-          });
-          setStatus(`Localisation trouvée : ${data.formattedName || cleanCity}`);
-        } else {
-          // Pas de coordonnées trouvées, utiliser seulement le nom
-          setLocation({
-            latitude: 0, // Valeurs temporaires
-            longitude: 0,
-            city: cleanCity,
-            publicCity: cleanCity,
-            method: 'manual',
-            precision: 'low',
-            accuracy: 'Saisie manuelle (géolocalisation échouée)'
-          });
-          setStatus(`Localisation définie : ${cleanCity} (sans coordonnées GPS)`);
-        }
+      // Utiliser le GeolocationManager pour géocoder la ville
+      const cityLocation = await geolocationManager.geocodeCity(cleanCity);
+      
+      if (cityLocation) {
+        setLocation(cityLocation);
+        setStatus(`Localisation trouvée : ${cityLocation.publicCity || cityLocation.city}`);
       } else {
-        // Erreur API, utiliser seulement le nom
-        setLocation({
+        // Fallback : créer une entrée manuelle sans coordonnées
+        const manualLocation: LocationData = {
           latitude: 0,
           longitude: 0,
           city: cleanCity,
           publicCity: cleanCity,
           method: 'manual',
           precision: 'low',
-          accuracy: 'Saisie manuelle (pas de coordonnées GPS)'
-        });
+          accuracy: 'Saisie manuelle (pas de coordonnées GPS)',
+          timestamp: Date.now()
+        };
+        
+        setLocation(manualLocation);
         setStatus(`Localisation définie : ${cleanCity}`);
       }
     } catch (error) {
       console.warn('Erreur géolocalisation automatique:', error);
-      // En cas d'erreur, utiliser seulement le nom
-      setLocation({
+      
+      // En cas d'erreur, créer une entrée manuelle
+      const manualLocation: LocationData = {
         latitude: 0,
         longitude: 0,
         city: cleanCity,
         publicCity: cleanCity,
         method: 'manual',
         precision: 'low',
-        accuracy: 'Saisie manuelle (pas de coordonnées GPS)'
-      });
+        accuracy: 'Saisie manuelle (géocodage échoué)',
+        timestamp: Date.now()
+      };
+      
+      setLocation(manualLocation);
       setStatus(`Localisation définie : ${cleanCity}`);
     }
   };
@@ -419,12 +265,28 @@ export const LocationPickerSimple: React.FC<LocationPickerSimpleProps> = ({
           </div>
         </div>
         
-        {/* Instructions d'aide pour GPS */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
-          <div className="font-medium mb-1">💡 Astuce :</div>
-          <div className="text-xs">
-            Si le GPS ne fonctionne pas, cliquez sur l'icône 🔒 dans la barre d'adresse pour autoriser la géolocalisation.
+        {/* Instructions d'aide pour GPS et navigation privée */}
+        <div className="space-y-2">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
+            <div className="font-medium mb-1">💡 Astuce :</div>
+            <div className="text-xs">
+              Si le GPS ne fonctionne pas, cliquez sur l'icône 🔒 dans la barre d'adresse pour autoriser la géolocalisation.
+            </div>
           </div>
+          
+          {/* Alerte navigation privée si détectée */}
+          {storageManager.isPrivateMode() && (
+            <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-sm text-orange-800">
+              <div className="flex items-center gap-2 mb-1">
+                <AlertTriangle className="w-4 h-4" />
+                <div className="font-medium">Mode navigation privée détecté</div>
+              </div>
+              <div className="text-xs">
+                En mode privé, vous devrez autoriser la géolocalisation à chaque visite. 
+                Les permissions ne sont pas conservées entre les sessions.
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

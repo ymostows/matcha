@@ -2,15 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '../ui/button';
-import { Heart, User, Home, LogOut, Search, Menu, X, MessageCircle, MapPin } from 'lucide-react';
+import { Heart, User, Home, LogOut, Search, Menu, X, MessageCircle, MapPin, HelpCircle } from 'lucide-react';
 import { NotificationBell } from '../notifications/NotificationBell';
 import { useSocket } from '../../contexts/SocketContext';
+import { BrowserDiagnostics } from '../diagnostics/BrowserDiagnostics';
+import storageManager from '../../utils/storageManager';
 
 export const Header: React.FC = () => {
   const { user, token, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
   const { getTotalUnreadMessages } = useSocket();
   
   const isAuthenticated = !!(user && token);
@@ -78,6 +81,20 @@ export const Header: React.FC = () => {
                 {/* Notification Bell */}
                 <NotificationBell />
                 
+                {/* Bouton de diagnostic (visible si problèmes détectés) */}
+                {(storageManager.isPrivateMode() || !storageManager.isWorking()) && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowDiagnostics(true)}
+                    className="flex items-center gap-2 text-orange-600 border-orange-200 hover:bg-orange-50"
+                    title="Diagnostic du navigateur"
+                  >
+                    <HelpCircle className="w-4 h-4" />
+                    <span className="hidden lg:inline">Diagnostic</span>
+                  </Button>
+                )}
+                
                 <Button
                   variant="ghost"
                   size="sm" 
@@ -125,6 +142,19 @@ export const Header: React.FC = () => {
                 )}
               </Button>
             ))}
+            {/* Bouton de diagnostic mobile */}
+            {(storageManager.isPrivateMode() || !storageManager.isWorking()) && (
+              <Button
+                variant="outline"
+                size="lg"
+                onClick={() => setShowDiagnostics(true)}
+                className="flex justify-start items-center gap-4 w-full text-orange-600 border-orange-200 hover:bg-orange-50"
+              >
+                <HelpCircle className="w-5 h-5" />
+                <span>Diagnostic du navigateur</span>
+              </Button>
+            )}
+            
             <Button
               variant="ghost"
               size="lg"
@@ -137,6 +167,13 @@ export const Header: React.FC = () => {
           </nav>
         </div>
       )}
+      
+      {/* Composant de diagnostic */}
+      <BrowserDiagnostics 
+        isVisible={showDiagnostics}
+        onClose={() => setShowDiagnostics(false)}
+        showDetailed={true}
+      />
     </header>
   );
 };

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode, useRef } from 'react';
 import { useAuth } from './AuthContext';
-import { io, Socket } from 'socket.io-client';
+import { Socket } from 'socket.io-client';
+import SocketManager from '../utils/socketManager';
 
 interface Notification {
   id: number;
@@ -48,6 +49,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   const { token, user } = useAuth();
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [socketManager, setSocketManager] = useState<SocketManager | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
@@ -58,63 +60,66 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   const stopTypingCallbacks = useRef<((data: any) => void)[]>([]);
   const [totalUnreadMessages, setTotalUnreadMessages] = useState(0);
 
-  // Connexion Socket.io
+  // Connexion Socket.io avec le SocketManager résilient
   useEffect(() => {
     if (token && user) {
-      console.log('🔌 Connexion Socket.io...');
+      console.log('🔌 Initialisation SocketManager...');
       
-      const newSocket = io('http://localhost:3001', {
-        auth: {
-          token: token
-        },
-        autoConnect: true,
-        reconnection: true,
+      const manager = new SocketManager({
+        url: 'http://localhost:3001',
+        auth: { token },
+        enableHeartbeat: true,
+        heartbeatInterval: 30000,
+        maxReconnectAttempts: 10,
         reconnectionDelay: 1000,
-        reconnectionAttempts: 5,
-        timeout: 5000
+        enableFallbackPolling: true,
+        pollingInterval: 5000
       });
 
-      newSocket.on('connect', () => {
-        console.log('🔌 Socket.io connecté!');
+      // Écouter les événements de connexion
+      const cleanupConnected = manager.on('socket_connected', () => {
+        console.log('🔌 SocketManager connecté!');
         setIsConnected(true);
         refreshNotifications();
       });
 
-      newSocket.on('disconnect', () => {
-        console.log('🔌 Socket.io déconnecté');
+      const cleanupDisconnected = manager.on('socket_disconnected', (reason) => {
+        console.log('🔌 SocketManager déconnecté:', reason);
         setIsConnected(false);
       });
 
-      newSocket.on('connect_error', (error) => {
-        console.error('🔌 Erreur de connexion Socket.io:', error);
+      const cleanupError = manager.on('socket_error', (error) => {
+        console.error('🔌 Erreur SocketManager:', error);
         setIsConnected(false);
       });
 
-      // Événements de notifications
-      newSocket.on('new_notification', (notification: Notification) => {
+      const cleanupFallback = manager.on('fallback_polling_started', () => {
+        console.log('🔄 Fallback polling activé');
+        // Optionnel : notifier l'utilisateur que le chat fonctionne en mode dégradé
+      });
+
+      // Événements de notifications avec le SocketManager
+      const cleanupNewNotification = manager.on('new_notification', (notification: Notification) => {
         console.log('🔔 Nouvelle notification reçue:', notification);
         setNotifications(prev => [notification, ...prev]);
         setUnreadCount(prev => prev + 1);
       });
 
-      // Événements de messages
-      newSocket.on('new_message', (message: any) => {
+      // Événements de messages avec le SocketManager
+      const cleanupNewMessage = manager.on('new_message', (message: any) => {
         console.log('💬 Nouveau message reçu:', message);
         messageCallbacks.current.forEach(callback => callback(message));
-        // Mettre à jour le compteur de messages non lus
         updateUnreadMessageCount();
       });
 
-      newSocket.on('message_read', (data: any) => {
+      const cleanupMessageRead = manager.on('message_read', (data: any) => {
         console.log('👁️ Message lu:', data);
         messageReadCallbacks.current.forEach(callback => callback(data));
       });
 
-      newSocket.on('messages_read', (data: any) => {
-        // Mettre à jour le compteur global
+      const cleanupMessagesRead = manager.on('messages_read', (data: any) => {
         updateUnreadMessageCount();
         
-        // Marquer les notifications de messages de cette conversation comme lues
         if (data.conversationId) {
           setNotifications(prev => 
             prev.map(notif => {
@@ -126,7 +131,6 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
             })
           );
           
-          // Recalculer le compteur de notifications non lues
           setUnreadCount(prev => {
             const messageNotifs = notifications.filter(n => 
               n.type === 'MESSAGE' && 
@@ -140,19 +144,19 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
         messageReadCallbacks.current.forEach(callback => callback(data));
       });
 
-      // Événements de typing
-      newSocket.on('user_typing', (data: { userId: number; username: string }) => {
+      // Événements de typing avec le SocketManager
+      const cleanupUserTyping = manager.on('user_typing', (data: { userId: number; username: string }) => {
         console.log('⌨️ Utilisateur en train de taper:', data);
         typingCallbacks.current.forEach(callback => callback(data));
       });
 
-      newSocket.on('user_stop_typing', (data: { userId: number; username: string }) => {
+      const cleanupUserStopTyping = manager.on('user_stop_typing', (data: { userId: number; username: string }) => {
         console.log('⌨️ Utilisateur a arrêté de taper:', data);
         stopTypingCallbacks.current.forEach(callback => callback(data));
       });
 
-      // Événements de statut en ligne
-      newSocket.on('user_online', (user: OnlineUser) => {
+      // Événements de statut en ligne avec le SocketManager
+      const cleanupUserOnline = manager.on('user_online', (user: OnlineUser) => {
         console.log('🟢 Utilisateur en ligne:', user);
         setOnlineUsers(prev => {
           if (!prev.find(u => u.userId === user.userId)) {
@@ -162,21 +166,55 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
         });
       });
 
-      newSocket.on('user_offline', (user: OnlineUser) => {
+      const cleanupUserOffline = manager.on('user_offline', (user: OnlineUser) => {
         console.log('🔴 Utilisateur hors ligne:', user);
         setOnlineUsers(prev => prev.filter(u => u.userId !== user.userId));
       });
 
-      setSocket(newSocket);
+      // Gérer les mises à jour en mode fallback polling
+      const cleanupNotificationsUpdate = manager.on('notifications_update', (data: any) => {
+        if (data.notifications) {
+          setNotifications(data.notifications);
+          const unread = data.notifications.filter((notif: Notification) => !notif.is_read).length;
+          setUnreadCount(unread);
+        }
+      });
+
+      const cleanupMessagesUpdate = manager.on('messages_update', (data: any) => {
+        if (data.conversations) {
+          const total = data.conversations.reduce((acc: number, conv: any) => acc + (conv.unread_count || 0), 0);
+          setTotalUnreadMessages(total);
+        }
+      });
+
+      setSocketManager(manager);
+      manager.connect();
 
       return () => {
-        console.log('🔌 Nettoyage Socket.io');
-        newSocket.disconnect();
+        console.log('🔌 Nettoyage SocketManager');
+        // Nettoyer tous les handlers
+        cleanupConnected();
+        cleanupDisconnected();
+        cleanupError();
+        cleanupFallback();
+        cleanupNewNotification();
+        cleanupNewMessage();
+        cleanupMessageRead();
+        cleanupMessagesRead();
+        cleanupUserTyping();
+        cleanupUserStopTyping();
+        cleanupUserOnline();
+        cleanupUserOffline();
+        cleanupNotificationsUpdate();
+        cleanupMessagesUpdate();
+        
+        manager.destroy();
       };
     } else {
       // Pas de token, nettoyer la connexion
-      if (socket) {
-        socket.disconnect();
+      if (socketManager) {
+        socketManager.destroy();
+        setSocketManager(null);
         setSocket(null);
         setIsConnected(false);
       }
@@ -232,20 +270,20 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   };
 
   const joinConversation = (conversationId: number) => {
-    if (socket && isConnected) {
-      socket.emit('join_conversation', conversationId);
+    if (socketManager) {
+      socketManager.emit('join_conversation', conversationId);
     }
   };
 
   const leaveConversation = (conversationId: number) => {
-    if (socket && isConnected) {
-      socket.emit('leave_conversation', conversationId);
+    if (socketManager) {
+      socketManager.emit('leave_conversation', conversationId);
     }
   };
 
   const markNotificationRead = async (notificationId: number) => {
-    if (socket && isConnected) {
-      socket.emit('mark_notification_read', notificationId);
+    if (socketManager) {
+      socketManager.emit('mark_notification_read', notificationId);
     }
     
     // Mettre à jour l'état local immédiatement
@@ -260,14 +298,14 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   };
 
   const startTyping = (conversationId: number) => {
-    if (socket && isConnected) {
-      socket.emit('typing_start', conversationId);
+    if (socketManager) {
+      socketManager.emit('typing_start', conversationId);
     }
   };
 
   const stopTyping = (conversationId: number) => {
-    if (socket && isConnected) {
-      socket.emit('typing_stop', conversationId);
+    if (socketManager) {
+      socketManager.emit('typing_stop', conversationId);
     }
   };
 
