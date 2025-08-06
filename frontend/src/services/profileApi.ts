@@ -156,6 +156,7 @@ export const profileApi = {
     minFameRating?: number;
     maxFameRating?: number;
     commonTags?: string[];
+    cities?: string[];
   }): Promise<CompleteProfile[]> {
     const params = new URLSearchParams();
     
@@ -168,6 +169,9 @@ export const profileApi = {
     if (filters.maxFameRating !== undefined) params.append('maxFameRating', filters.maxFameRating.toString());
     if (filters.commonTags?.length) {
       filters.commonTags.forEach(tag => params.append('commonTags', tag));
+    }
+    if (filters.cities?.length) {
+      filters.cities.forEach(city => params.append('cities', city));
     }
 
     const response = await api.get<ApiResponse<CompleteProfile[]>>(`/profile/browse?${params.toString()}`);

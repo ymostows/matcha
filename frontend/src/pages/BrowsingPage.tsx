@@ -266,12 +266,20 @@ const BrowsingPage: React.FC = () => {
 
   // Ajuster automatiquement l'ordre de tri selon le type de tri
   useEffect(() => {
+    // Éviter les boucles infinies en vérifiant l'état actuel avant de mettre à jour
+    let newSortOrder = sortOrder;
+    
     if ((sortBy === 'common_tags' || sortBy === 'fame_rating') && sortOrder === 'asc') {
-      updateFilters({ sortOrder: 'desc' });
+      newSortOrder = 'desc';
     } else if ((sortBy === 'distance' || sortBy === 'age') && sortOrder === 'desc') {
-      updateFilters({ sortOrder: 'asc' });
+      newSortOrder = 'asc';
     }
-  }, [sortBy]);
+    
+    // Ne mettre à jour que si l'ordre de tri doit réellement changer
+    if (newSortOrder !== sortOrder) {
+      updateFilters({ sortOrder: newSortOrder });
+    }
+  }, [sortBy]); // Retirer sortOrder des dépendances pour éviter les boucles
 
   useEffect(() => {
     fetchProfiles();
