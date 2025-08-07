@@ -47,6 +47,22 @@ router.get('/conversations', authenticateToken, async (req: Request, res: Respon
           WHEN c.user1_id = $1 THEN c.user2_id
           ELSE c.user1_id
         END as other_user_id,
+        CASE 
+          WHEN c.user1_id = $1 THEN (
+            SELECT id 
+            FROM photos 
+            WHERE user_id = u2.id 
+            ORDER BY is_profile_picture DESC, upload_date ASC
+            LIMIT 1
+          )
+          ELSE (
+            SELECT id 
+            FROM photos 
+            WHERE user_id = u1.id 
+            ORDER BY is_profile_picture DESC, upload_date ASC
+            LIMIT 1
+          )
+        END as other_user_photo_id,
         (
           SELECT content 
           FROM messages 
@@ -69,6 +85,9 @@ router.get('/conversations', authenticateToken, async (req: Request, res: Respon
     `;
 
     const result = await pool.query(query, [userId]);
+    
+    // Log de debug pour voir les données
+    console.log('🔍 DEBUG - Conversations récupérées:', JSON.stringify(result.rows.slice(0, 2), null, 2));
     
     res.json({
       success: true,
