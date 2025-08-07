@@ -74,30 +74,19 @@ export const useProfileCompletion = (): ProfileCompletionStatus => {
       return;
     }
 
-    // Prioriser le champ isComplete de la base de données si disponible
-    if (typeof (user as any).isComplete === 'boolean') {
-      const isComplete = (user as any).isComplete;
-      
-      // Si le profil est marqué comme complet dans la DB, utiliser cela
-      if (isComplete) {
-        setStatus({
-          isComplete: true,
-          isLoading: false,
-          completionPercentage: 100,
-          missingFields: []
-        });
-        return;
-      }
-    }
-
-    // Sinon, utiliser la logique de validation existante comme fallback
+    // Toujours valider les données réelles, même si isComplete est true dans la DB
     const { isComplete, completionPercentage, missingFields } = checkProfileCompletion(user);
 
+    // Si le profil est marqué comme complet dans la DB mais que la validation échoue,
+    // utiliser la validation réelle pour éviter les incohérences
+    const dbIsComplete = (user as any).isComplete;
+    const finalIsComplete = dbIsComplete && isComplete ? true : isComplete;
+
     setStatus({
-      isComplete,
+      isComplete: finalIsComplete,
       isLoading: false,
       completionPercentage,
-      missingFields
+      missingFields: finalIsComplete ? [] : missingFields
     });
   }, [user]);
 

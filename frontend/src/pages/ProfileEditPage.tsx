@@ -23,9 +23,11 @@ export const ProfileEditPage: React.FC = () => {
     const loadProfile = async () => {
       try {
         const profileData = await profileApi.getMyProfile();
-        setProfile(profileData);
+        // S'assurer qu'on a un objet même en cas de données partielles
+        setProfile(profileData || {});
       } catch (error) {
-        setError('Impossible de charger votre profil.');
+        console.error('Erreur chargement profil pour édition:', error);
+        setError('Impossible de charger votre profil. Vérifiez votre connexion.');
       } finally {
         setIsLoading(false);
       }

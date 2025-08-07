@@ -43,15 +43,23 @@ export const ProfileCompletionPage: React.FC = () => {
     const loadProfile = async () => {
       try {
         const profileData = await profileApi.getMyProfile();
-        setProfile(profileData);
+        // S'assurer que les données existent même si incomplètes
+        setProfile(profileData || {});
       } catch (error) {
-        setProfile({}); // Initialiser comme objet vide si pas de profil
+        console.warn('Erreur chargement profil:', error);
+        // Garder un objet avec les champs de base au lieu d'objet vide
+        setProfile({
+          first_name: user?.first_name || '',
+          last_name: user?.last_name || '', 
+          email: user?.email || '',
+          photos: []
+        });
       } finally {
         setIsLoading(false);
       }
     };
     loadProfile();
-  }, []);
+  }, [user]);
 
   const saveFullProfile = async (): Promise<boolean> => {
     setIsSaving(true);
