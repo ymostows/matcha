@@ -15,6 +15,7 @@ import { profileApi, LikeHistoryItem } from '../../services/profileApi';
 import { getPhotoUrl } from '../../utils/imageUtils';
 import { useToast } from '../../hooks/useToast';
 import { useNavigate } from 'react-router-dom';
+import { getTimeAgo } from '../../utils/dateUtils';
 
 interface LikesHistoryProps {
   limit?: number;
@@ -87,22 +88,6 @@ export const LikesHistory: React.FC<LikesHistoryProps> = ({
   // Utilisation de l'utilitaire centralisé pour les URLs d'images
   const getPhotoUrlLocal = getPhotoUrl;
 
-  const formatTimeAgo = useCallback((dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
-    
-    if (diffInMinutes < 1) return 'À l\'instant';
-    if (diffInMinutes < 60) return `Il y a ${diffInMinutes}min`;
-    
-    const diffInHours = Math.floor(diffInMinutes / 60);
-    if (diffInHours < 24) return `Il y a ${diffInHours}h`;
-    
-    const diffInDays = Math.floor(diffInHours / 24);
-    if (diffInDays < 30) return `Il y a ${diffInDays}j`;
-    
-    return date.toLocaleDateString('fr-FR');
-  }, []);
 
   if (isLoading && !isInitialized) {
     return (
@@ -281,7 +266,7 @@ export const LikesHistory: React.FC<LikesHistoryProps> = ({
                             
                             <div className="flex items-center justify-between text-[10px] sm:text-xs text-twilight/60 mb-1">
                               <span className="truncate flex-1 min-w-0">@{like.username}</span>
-                              <span className="flex-shrink-0 ml-1">{formatTimeAgo(like.created_at)}</span>
+                              <span className="flex-shrink-0 ml-1">{getTimeAgo(like.created_at)}</span>
                             </div>
                             
                             {like.city && (
@@ -458,7 +443,7 @@ export const LikesHistory: React.FC<LikesHistoryProps> = ({
 
                       <div className="flex items-center justify-center gap-1 text-xs text-twilight/60">
                         <Calendar className="w-3 h-3 flex-shrink-0" />
-                        <span>{formatTimeAgo(like.created_at)}</span>
+                        <span>{getTimeAgo(like.created_at)}</span>
                       </div>
                     </div>
 

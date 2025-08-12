@@ -7,6 +7,7 @@ import { Card, CardContent } from '../ui/card';
 import { MatchItem } from '../../services/profileApi';
 import { API_BASE_URL } from '../../services/api';
 import { getPhotoUrl as getStandardPhotoUrl } from '../../utils/imageUtils';
+import { getTimeAgo as getTimeAgoUtil } from '../../utils/dateUtils';
 
 interface MatchCardProps {
   match: MatchItem;
@@ -57,18 +58,6 @@ export const MatchCard: React.FC<MatchCardProps> = ({
     return `${API_BASE_URL.replace('/api', '')}/api/photos/${filename}`;
   };
 
-  const getTimeAgo = (dateString: string) => {
-    const now = new Date();
-    const date = new Date(dateString);
-    const diffInMs = now.getTime() - date.getTime();
-    const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
-    
-    if (diffInDays === 0) return "Aujourd'hui";
-    if (diffInDays === 1) return "Hier";
-    if (diffInDays < 7) return `Il y a ${diffInDays} jours`;
-    if (diffInDays < 30) return `Il y a ${Math.floor(diffInDays / 7)} semaines`;
-    return `Il y a ${Math.floor(diffInDays / 30)} mois`;
-  };
 
 
   return (
@@ -130,7 +119,7 @@ export const MatchCard: React.FC<MatchCardProps> = ({
               
               <div className="flex items-center justify-between text-xs sm:text-sm text-twilight/60 mb-1">
                 <span className="truncate flex-1 min-w-0">@{match.username}</span>
-                <span className="flex-shrink-0 ml-1">{getTimeAgo(match.matched_at)}</span>
+                <span className="flex-shrink-0 ml-1">{getTimeAgoUtil(match.matched_at)}</span>
               </div>
               
               {match.city && (

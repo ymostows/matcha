@@ -7,6 +7,7 @@ import { Badge } from '../ui/badge';
 import { chatApi, Conversation } from '../../services/chatApi';
 import { useSocket } from '../../contexts/SocketContext';
 import { useToast } from '../../hooks/useToast';
+import { formatConversationTime } from '../../utils/dateUtils';
 
 interface ConversationsListProps {
   className?: string;
@@ -124,22 +125,6 @@ const ConversationsList: React.FC<ConversationsListProps> = ({ className = '' })
     });
   };
 
-  const formatLastMessageTime = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
-
-    if (diffInHours < 1) {
-      return 'À l\'instant';
-    } else if (diffInHours < 24) {
-      return `Il y a ${Math.floor(diffInHours)}h`;
-    } else {
-      return date.toLocaleDateString('fr-FR', {
-        day: 'numeric',
-        month: 'short'
-      });
-    }
-  };
 
   const isUserOnline = (userId: number) => {
     return onlineUsers.some(user => user.userId === userId);
@@ -245,7 +230,7 @@ const ConversationsList: React.FC<ConversationsListProps> = ({ className = '' })
                         )}
                         <div className="flex items-center text-xs text-gray-500">
                           <Clock className="w-3 h-3 mr-1" />
-                          {formatLastMessageTime(conversation.last_message_at)}
+                          {formatConversationTime(conversation.last_message_at)}
                         </div>
                       </div>
                     </div>

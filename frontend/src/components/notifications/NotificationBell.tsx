@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Bell, X, Clock, Heart, Eye, MessageCircle, UserMinus } from 'lucide-react';
 import { Button } from '../ui/button';
 import { useSocket } from '../../contexts/SocketContext';
+import { getTimeAgo } from '../../utils/dateUtils';
 
 interface NotificationItemProps {
   notification: {
@@ -32,16 +33,6 @@ const NotificationItem: React.FC<NotificationItemProps> = ({ notification }) => 
     }
   };
 
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
-
-    if (diffInMinutes < 1) return 'À l\'instant';
-    if (diffInMinutes < 60) return `Il y a ${diffInMinutes}min`;
-    if (diffInMinutes < 1440) return `Il y a ${Math.floor(diffInMinutes / 60)}h`;
-    return `Il y a ${Math.floor(diffInMinutes / 1440)}j`;
-  };
 
   const getBgColor = (type: string, isRead: boolean) => {
     if (isRead) return 'bg-white hover:bg-gray-50';
@@ -74,7 +65,7 @@ const NotificationItem: React.FC<NotificationItemProps> = ({ notification }) => 
           <div className="flex items-center gap-2 mt-2">
             <Clock className="w-3 h-3 text-gray-400" />
             <span className="text-xs text-gray-500 font-medium">
-              {formatTime(notification.created_at)}
+              {getTimeAgo(notification.created_at)}
             </span>
             {!notification.is_read && (
               <span className="text-xs px-2 py-0.5 bg-gradient-to-r from-rose-400 to-pink-500 text-white rounded-full font-semibold shadow-sm">

@@ -4,7 +4,6 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '../ui/button';
 import { Heart, User, Home, LogOut, Search, Menu, X, MessageCircle, MapPin, HelpCircle } from 'lucide-react';
 import { NotificationBell } from '../notifications/NotificationBell';
-import { useSocket } from '../../contexts/SocketContext';
 import { BrowserDiagnostics } from '../diagnostics/BrowserDiagnostics';
 import storageManager from '../../utils/storageManager';
 
@@ -14,7 +13,6 @@ export const Header: React.FC = () => {
   const location = useLocation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
-  const { getTotalUnreadMessages } = useSocket();
   
   const isAuthenticated = !!(user && token);
   
@@ -66,15 +64,10 @@ export const Header: React.FC = () => {
                     variant={location.pathname.startsWith(link.path) ? 'default' : 'ghost'}
                     size="sm" 
                     onClick={() => navigate(link.path)}
-                    className="flex items-center gap-2 relative"
+                    className="flex items-center gap-2"
                   >
                     <link.icon className="w-4 h-4" />
                     {link.label}
-                    {link.path === '/conversations' && getTotalUnreadMessages() > 0 && (
-                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center min-w-[20px]">
-                        {getTotalUnreadMessages() > 99 ? '99+' : getTotalUnreadMessages()}
-                      </span>
-                    )}
                   </Button>
                 ))}
                 
@@ -131,15 +124,10 @@ export const Header: React.FC = () => {
                 variant={location.pathname.startsWith(link.path) ? 'default' : 'ghost'} 
                 size="lg"
                 onClick={() => navigate(link.path)}
-                className="flex justify-start items-center gap-4 w-full relative"
+                className="flex justify-start items-center gap-4 w-full"
               >
                 <link.icon className="w-5 h-5" />
                 <span>{link.label}</span>
-                {link.path === '/conversations' && getTotalUnreadMessages() > 0 && (
-                  <span className="ml-auto bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center min-w-[20px]">
-                    {getTotalUnreadMessages() > 99 ? '99+' : getTotalUnreadMessages()}
-                  </span>
-                )}
               </Button>
             ))}
             {/* Bouton de diagnostic mobile */}

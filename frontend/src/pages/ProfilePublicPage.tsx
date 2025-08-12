@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { isUserOnline, formatLastSeen } from '../utils/dateUtils';
 import { toast } from 'react-toastify';
 import { 
   ArrowLeft, 
@@ -156,26 +157,7 @@ export const ProfilePublicPage: React.FC = () => {
   };
 
 
-  const isUserOnline = (lastSeen: string) => {
-    const lastSeenDate = new Date(lastSeen);
-    const now = new Date();
-    const diffMinutes = (now.getTime() - lastSeenDate.getTime()) / (1000 * 60);
-    return diffMinutes < 5; // Considéré en ligne si vu dans les 5 dernières minutes
-  };
 
-  const formatLastSeen = (lastSeen: string) => {
-    const lastSeenDate = new Date(lastSeen);
-    const now = new Date();
-    const diffMinutes = (now.getTime() - lastSeenDate.getTime()) / (1000 * 60);
-    
-    if (diffMinutes < 60) {
-      return `il y a ${Math.floor(diffMinutes)} min`;
-    } else if (diffMinutes < 24 * 60) {
-      return `il y a ${Math.floor(diffMinutes / 60)} h`;
-    } else {
-      return `le ${lastSeenDate.toLocaleDateString('fr-FR')} à ${lastSeenDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`;
-    }
-  };
 
   // Utilisation de l'utilitaire centralisé
   const getPhotoUrl = (photoId: number): string => {

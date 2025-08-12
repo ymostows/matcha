@@ -10,6 +10,7 @@ import { useToast } from '../hooks/useToast';
 import { useSocket } from '../contexts/SocketContext';
 import { useAuth } from '../contexts/AuthContext';
 import storageManager from '../utils/storageManager';
+import { formatChatTime } from '../utils/dateUtils';
 
 const ChatPage: React.FC = () => {
   const { conversationId } = useParams<{ conversationId: string }>();
@@ -479,10 +480,7 @@ const ChatPage: React.FC = () => {
                       <p className="text-sm leading-relaxed">{message.content}</p>
                       <div className="flex items-center justify-between mt-1 gap-2">
                         <p className="text-xs opacity-70 whitespace-nowrap">
-                          {new Date(message.created_at).toLocaleTimeString('fr-FR', {
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
+                          {formatChatTime(message.created_at)}
                         </p>
                         {user && message.sender_id === user.id && (
                           <div className={`text-xs flex items-center ${message.is_read ? 'text-blue-500' : 'text-gray-400'}`}>
