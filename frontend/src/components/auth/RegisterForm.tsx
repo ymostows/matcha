@@ -369,25 +369,12 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) =
               <Button
                 type="submit"
                 disabled={isLoading}
-                className="w-full h-14 text-lg font-semibold bg-primary hover:bg-accent hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] disabled:transform-none"
+                className="w-full h-14 text-lg font-semibold bg-primary hover:bg-accent hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] disabled:transform-none text-white"
               >
                 {isLoading ? (
-                  <motion.div 
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="flex items-center justify-center gap-3"
-                  >
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    Création du compte...
-                  </motion.div>
+                  <span className="!text-white font-semibold">Création en cours...</span>
                 ) : (
-                  <motion.div 
-                    whileHover={{ scale: 1.05 }}
-                    className="flex items-center justify-center gap-3"
-                  >
-                    <Heart className="w-5 h-5" fill="currentColor" />
-                    Créer mon compte
-                  </motion.div>
+                  <span className="!text-white font-semibold">S'inscrire</span>
                 )}
               </Button>
             </motion.div>
