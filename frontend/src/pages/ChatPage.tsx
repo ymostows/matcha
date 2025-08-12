@@ -431,16 +431,19 @@ const ChatPage: React.FC = () => {
                   <span className="truncate">{conversationTitle}</span>
                 )}
               </div>
-              {isConnected ? (
-                <div className="flex items-center gap-1 text-xs text-green-600">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  Connecté
-                </div>
-              ) : (
-                <div className="flex items-center gap-1 text-xs text-gray-500">
-                  <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-                  Déconnecté
-                </div>
+              {/* Afficher l'indicateur WebSocket seulement si l'utilisateur n'est pas détecté comme "En ligne" */}
+              {!(otherUser && onlineUsers.some(u => u.userId === otherUser.id)) && (
+                isConnected ? (
+                  <div className="flex items-center gap-1 text-xs text-green-600">
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    Connecté
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1 text-xs text-gray-500">
+                    <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                    Déconnecté
+                  </div>
+                )
               )}
             </CardTitle>
           </CardHeader>
