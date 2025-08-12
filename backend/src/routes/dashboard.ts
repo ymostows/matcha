@@ -21,8 +21,10 @@ router.get('/stats', authenticateToken, async (req: Request, res: Response): Pro
         -- Nombre de vues de profil
         (SELECT COUNT(*) FROM profile_visits WHERE visited_id = $1) as profile_visits,
         
-        -- Nombre de messages non lus (à implémenter quand les conversations seront prêtes)
-        0 as unread_messages
+        -- Nombre total de messages envoyés et reçus par l'utilisateur
+        (SELECT COUNT(*) FROM messages m 
+         JOIN conversations c ON m.conversation_id = c.id 
+         WHERE c.user1_id = $1 OR c.user2_id = $1) as total_messages
     `, [userId]);
     
     const stats = result.rows[0];
@@ -32,7 +34,7 @@ router.get('/stats', authenticateToken, async (req: Request, res: Response): Pro
       stats: {
         likes: parseInt(stats.likes_received) || 0,
         matches: parseInt(stats.matches_count) || 0,
-        messages: parseInt(stats.unread_messages) || 0,
+        messages: parseInt(stats.total_messages) || 0,
         visits: parseInt(stats.profile_visits) || 0
       }
     });
