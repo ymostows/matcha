@@ -12,18 +12,6 @@ export const formatChatTime = (dateString: string): string => {
   // Créer la date à partir du timestamp UTC
   const utcDate = new Date(dateString);
   
-  // Debug: afficher les informations de la date
-  console.log('formatChatTime Debug:', {
-    input: dateString,
-    utcDate: utcDate.toISOString(),
-    utcHours: utcDate.getUTCHours(),
-    utcMinutes: utcDate.getUTCMinutes(),
-    localDate: utcDate.toString(),
-    localHours: utcDate.getHours(),
-    localMinutes: utcDate.getMinutes(),
-    timeZoneOffset: utcDate.getTimezoneOffset()
-  });
-  
   // Utiliser getHours() et getMinutes() qui appliquent automatiquement le fuseau local
   const hours = utcDate.getHours().toString().padStart(2, '0');
   const minutes = utcDate.getMinutes().toString().padStart(2, '0');
