@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { UserInfoForm } from '@/components/profile/UserInfoForm';
 import { PhotoUploadAdvanced } from '@/components/profile/PhotoUploadAdvanced';
 import { LocationPickerSimple } from '@/components/profile/LocationPickerSimple';
+import { UserManagementSection } from '@/components/profile/UserManagementSection';
 import { profileApi } from '@/services/profileApi';
 import { useAuth } from '@/contexts/AuthContext';
 import { CompleteProfile, ProfileData, UserUpdateData } from '@/services/profileApi';
@@ -166,6 +167,8 @@ export const ProfileEditPage: React.FC = () => {
             />
           </CardContent>
         </Card>
+
+        <UserManagementSection />
       </div>
     </div>
   );
