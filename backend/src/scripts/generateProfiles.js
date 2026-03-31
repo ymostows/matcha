@@ -169,13 +169,13 @@ async function createProfile(userId, profileData) {
   const client = await pool.connect();
   try {
     const query = `
-      UPDATE profiles 
-      SET biography = $2, age = $3, gender = $4, sexual_orientation = $5, 
-          interests = $6, city = $7, updated_at = CURRENT_TIMESTAMP
+      UPDATE profiles
+      SET biography = $2, age = $3, gender = $4, sexual_orientation = $5,
+          interests = $6, city = $7, fame_rating = $8, updated_at = CURRENT_TIMESTAMP
       WHERE user_id = $1
       RETURNING *
     `;
-    
+
     const values = [
       userId,
       profileData.biography,
@@ -183,7 +183,8 @@ async function createProfile(userId, profileData) {
       profileData.gender,
       profileData.sexual_orientation,
       profileData.interests,
-      profileData.city
+      profileData.city,
+      profileData.fame_rating
     ];
     
     const result = await client.query(query, values);
@@ -245,7 +246,8 @@ async function generateProfiles(count = 10) {
       const firstName = name.first;
       const lastName = name.last;
       
-      const username = `${firstName.toLowerCase()}.${lastName.toLowerCase()}${Math.floor(Math.random() * 999)}`;
+      const uniqueSuffix = `${Date.now()}${Math.floor(Math.random() * 9999)}`;
+      const username = `${firstName.toLowerCase()}.${lastName.toLowerCase()}${uniqueSuffix}`;
       const email = `${username}@example.com`;
       const age = Math.floor(Math.random() * 18) + 22; // 22-39 ans
       
@@ -287,7 +289,8 @@ async function generateProfiles(count = 10) {
           gender,
           sexual_orientation: orientation,
           interests: userInterests,
-          city
+          city,
+          fame_rating: Math.floor(Math.random() * 80) + 10  // 10-90
         };
         
         await createProfile(user.id, profileData);

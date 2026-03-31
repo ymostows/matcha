@@ -209,8 +209,7 @@ class SocketManager {
     // Ne pas reconnecter si explicitement fermé par le serveur
     const noReconnectReasons = [
       'io server disconnect',
-      'io client disconnect',
-      'ping timeout'
+      'io client disconnect'
     ];
 
     return !noReconnectReasons.includes(reason);

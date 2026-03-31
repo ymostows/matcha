@@ -530,7 +530,7 @@ router.get('/browse', authenticateToken, async (req: Request, res: Response): Pr
         break;
       case 'distance':
       default:
-        orderClause = `ORDER BY distance_km ${sortOrder}`;
+        orderClause = `ORDER BY distance_km ASC, common_tags_count DESC, p.fame_rating DESC`;
         break;
     }
 
@@ -905,16 +905,16 @@ router.post('/like', authenticateToken, async (req: Request, res: Response): Pro
       return;
     }
 
-    // Vérifier que l'utilisateur qui like a au moins une photo de profil
+    // Vérifier que l'utilisateur qui like a au moins une photo de profil définie
     const userPhotosResult = await pool.query(
-      'SELECT COUNT(*) as photo_count FROM photos WHERE user_id = $1',
+      'SELECT COUNT(*) as photo_count FROM photos WHERE user_id = $1 AND is_profile_picture = true',
       [userId]
     );
-    
+
     if (parseInt(userPhotosResult.rows[0].photo_count) === 0) {
-      res.status(400).json({ 
-        success: false, 
-        message: 'Vous devez avoir au moins une photo de profil pour liker.' 
+      res.status(400).json({
+        success: false,
+        message: 'Vous devez avoir une photo de profil pour liker.'
       });
       return;
     }
@@ -1232,13 +1232,15 @@ router.get('/history/visits', authenticateToken, async (req: Request, res: Respo
     const limit = parseInt(req.query.limit as string) || 20;
     
     const result = await pool.query(`
-      SELECT 
+      SELECT
         v.id, v.visitor_id, v.visited_at,
         u.username, u.first_name, u.last_name,
-        p.age, p.city
+        p.age, p.city,
+        ph.id as photo_id
       FROM profile_visits v
       JOIN users u ON v.visitor_id = u.id
       LEFT JOIN profiles p ON u.id = p.user_id
+      LEFT JOIN photos ph ON ph.user_id = u.id AND ph.is_profile_picture = true
       WHERE v.visited_id = $1
       ORDER BY v.visited_at DESC
       LIMIT $2
@@ -1357,6 +1359,84 @@ router.post('/report', authenticateToken, async (req: Request, res: Response): P
       success: false, 
       message: 'Erreur serveur' 
     });
+  }
+});
+
+// GET /api/profile/blocked - Liste des utilisateurs bloqués par l'utilisateur connecté
+router.get('/blocked', authenticateToken, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = (req as any).user.userId;
+    const limit = parseInt(req.query.limit as string) || 20;
+
+    const result = await pool.query(`
+      SELECT b.blocked_id, b.created_at as blocked_at,
+        u.username, u.first_name, u.last_name,
+        p.age, p.city,
+        ph.id as photo_id, ph.filename
+      FROM blocks b
+      JOIN users u ON b.blocked_id = u.id
+      LEFT JOIN profiles p ON u.id = p.user_id
+      LEFT JOIN photos ph ON ph.user_id = u.id AND ph.is_profile_picture = true
+      WHERE b.blocker_id = $1
+      ORDER BY b.created_at DESC
+      LIMIT $2
+    `, [userId, limit]);
+
+    res.json({ success: true, blocked: result.rows });
+  } catch (error) {
+    console.error('Erreur liste bloqués:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// DELETE /api/profile/block/:userId - Débloquer un utilisateur
+router.delete('/block/:userId', authenticateToken, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = (req as any).user.userId;
+    const rawId = req.params.userId ?? '';
+    const targetUserId = parseInt(rawId, 10);
+
+    if (!rawId || isNaN(targetUserId)) {
+      res.status(400).json({ success: false, message: 'ID utilisateur invalide' });
+      return;
+    }
+
+    await pool.query(
+      'DELETE FROM blocks WHERE blocker_id = $1 AND blocked_id = $2',
+      [userId, targetUserId]
+    );
+
+    res.json({ success: true, message: 'Utilisateur débloqué' });
+  } catch (error) {
+    console.error('Erreur déblocage:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// GET /api/profile/reported - Liste des utilisateurs signalés par l'utilisateur connecté
+router.get('/reported', authenticateToken, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = (req as any).user.userId;
+    const limit = parseInt(req.query.limit as string) || 20;
+
+    const result = await pool.query(`
+      SELECT r.reported_id, r.created_at as reported_at, r.reason,
+        u.username, u.first_name, u.last_name,
+        p.age, p.city,
+        ph.id as photo_id, ph.filename
+      FROM reports r
+      JOIN users u ON r.reported_id = u.id
+      LEFT JOIN profiles p ON u.id = p.user_id
+      LEFT JOIN photos ph ON ph.user_id = u.id AND ph.is_profile_picture = true
+      WHERE r.reporter_id = $1
+      ORDER BY r.created_at DESC
+      LIMIT $2
+    `, [userId, limit]);
+
+    res.json({ success: true, reported: result.rows });
+  } catch (error) {
+    console.error('Erreur liste signalés:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 });
 

@@ -29,6 +29,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../hooks/useToast';
 import { useDialog } from '../hooks/useDialog';
 import { LikesHistory } from '../components/matches/LikesHistory';
+import { VisitsHistory } from '../components/matches/VisitsHistory';
 
 export const ProfilePublicPage: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
@@ -585,13 +586,22 @@ export const ProfilePublicPage: React.FC = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <LikesHistory 
+                <LikesHistory
                   limit={20}
                   showHeader={false}
                   compact={false}
                 />
               </CardContent>
             </Card>
+          )}
+
+          {/* Historique des visites - Seulement pour notre profil */}
+          {isOwnProfile && (
+            <VisitsHistory
+              limit={20}
+              showHeader={true}
+              compact={false}
+            />
           )}
 
           {/* Boutons d'actions - Fonctionnels */}

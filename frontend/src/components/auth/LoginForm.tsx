@@ -115,18 +115,18 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister }) => {
               className="space-y-2"
             >
               <label htmlFor="email" className="text-sm font-semibold text-charcoal block">
-                Adresse email
+                Email ou nom d'utilisateur
               </label>
               <div className="relative group">
                 <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 text-charcoal/50 w-5 h-5 group-focus-within:text-primary transition-colors" />
                 <Input
-                  type="email"
+                  type="text"
                   id="email"
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
                   className="pl-12 h-12 text-base border-primary/20 focus:border-primary/50 bg-white/70 backdrop-blur-sm"
-                  placeholder="votre@email.com"
+                  placeholder="votre@email.com ou nom_utilisateur"
                   disabled={isLoading}
                 />
               </div>

@@ -59,6 +59,7 @@ export interface VisitHistoryItem {
   last_name: string;
   age?: number;
   city?: string;
+  photo_id?: number;
 }
 
 // Type pour les matches
@@ -80,6 +81,31 @@ export interface MatchItem {
   last_seen: string;
 }
 
+export interface BlockedUser {
+  blocked_id: number;
+  blocked_at: string;
+  username: string;
+  first_name: string;
+  last_name: string;
+  age?: number;
+  city?: string;
+  photo_id?: number;
+  filename?: string;
+}
+
+export interface ReportedUser {
+  reported_id: number;
+  reported_at: string;
+  reason: string;
+  username: string;
+  first_name: string;
+  last_name: string;
+  age?: number;
+  city?: string;
+  photo_id?: number;
+  filename?: string;
+}
+
 // Types de réponse API
 interface ApiResponse<T> {
   success: boolean;
@@ -90,6 +116,8 @@ interface ApiResponse<T> {
   files?: string[];
   profiles?: CompleteProfile[];
   matches?: MatchItem[];
+  blocked?: BlockedUser[];
+  reported?: ReportedUser[];
 }
 
 // Interface pour les données utilisateur modifiables
@@ -310,5 +338,23 @@ export const profileApi = {
   async completeProfile(): Promise<{ success: boolean; message: string; profile?: CompleteProfile }> {
     const response = await api.post<{ success: boolean; message: string; profile?: CompleteProfile }>('/profile/complete');
     return response;
+  },
+
+  // Obtenir la liste des utilisateurs bloqués
+  async getBlockedUsers(limit: number = 20): Promise<BlockedUser[]> {
+    const response = await api.get<ApiResponse<BlockedUser[]>>(`/profile/blocked?limit=${limit}`);
+    return response.blocked || [];
+  },
+
+  // Débloquer un utilisateur
+  async unblockUser(userId: number): Promise<{ success: boolean; message: string }> {
+    const response = await api.delete<{ success: boolean; message: string }>(`/profile/block/${userId}`);
+    return response;
+  },
+
+  // Obtenir la liste des utilisateurs signalés
+  async getReportedUsers(limit: number = 20): Promise<ReportedUser[]> {
+    const response = await api.get<ApiResponse<ReportedUser[]>>(`/profile/reported?limit=${limit}`);
+    return response.reported || [];
   },
 }; 

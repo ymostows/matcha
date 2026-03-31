@@ -23,54 +23,45 @@ const generateResetToken = (): string => {
 const router = express.Router();
 
 // Route POST /register - Inscription avec vérification email obligatoire
-router.post('/register', async (req: Request, res: Response) => {
+router.post('/register', async (req: Request, res: Response): Promise<void> => {
   try {
     const { email, username, password, first_name, last_name } = req.body;
-    
+
     // Validation basique
     if (!email || !username || !password || !first_name || !last_name) {
-      return res.status(400).json({
-        success: false,
-        message: 'Tous les champs sont requis'
-      });
+      res.status(400).json({ success: false, message: 'Tous les champs sont requis' });
+      return;
     }
-    
+
     // Validation de l'email
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     if (!emailRegex.test(email)) {
-      res.status(400).json({
-        success: false,
-        message: 'Format d\'email invalide'
-      });
+      res.status(400).json({ success: false, message: 'Format d\'email invalide' });
       return;
     }
 
     // Validation du mot de passe sécurisé
     const passwordErrors = validatePassword(password);
     if (passwordErrors.length > 0) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         message: 'Le mot de passe ne respecte pas les critères de sécurité.',
         errors: passwordErrors
       });
+      return;
     }
-    
+
     // Vérifier que l'utilisateur n'existe pas déjà
     const existingEmail = await UserModel.findByEmail(email);
     if (existingEmail) {
-      res.status(409).json({
-        success: false,
-        message: 'Un utilisateur avec cet email existe déjà'
-      });
+      res.status(409).json({ success: false, message: 'Un utilisateur avec cet email existe déjà' });
       return;
     }
 
     const existingUsername = await UserModel.findByUsername(username);
     if (existingUsername) {
-      return res.status(409).json({
-        success: false,
-        message: 'Ce nom d\'utilisateur est déjà pris'
-      });
+      res.status(409).json({ success: false, message: 'Ce nom d\'utilisateur est déjà pris' });
+      return;
     }
     
     // Créer l'utilisateur avec token de vérification
@@ -215,18 +206,12 @@ router.post('/resend-verification', async (req: Request, res: Response) => {
     }
 
     const user = await UserModel.findByEmail(email);
-    if (!user) {
-      res.status(404).json({
-        success: false,
-        message: 'Aucun compte trouvé avec cet email'
-      });
-      return;
-    }
 
-    if (user.is_verified) {
-      res.status(400).json({
-        success: false,
-        message: 'Ce compte est déjà vérifié'
+    // Réponse générique pour ne pas révéler si l'email existe (anti-énumération)
+    if (!user || user.is_verified) {
+      res.json({
+        success: true,
+        message: 'Si ce compte existe et n\'est pas encore vérifié, un email vient d\'être envoyé.'
       });
       return;
     }
@@ -272,21 +257,25 @@ router.post('/resend-verification', async (req: Request, res: Response) => {
 router.post('/login', async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
-    
+
     if (!email || !password) {
       res.status(400).json({
         success: false,
-        message: 'Email et mot de passe requis'
+        message: 'Identifiant et mot de passe requis'
       });
       return;
     }
-    
-    // Trouver l'utilisateur
-    const user = await UserModel.findByEmail(email);
+
+    // Accepte email OU nom d'utilisateur (cahier des charges : connexion via username+password)
+    const isEmail = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email);
+    const user = isEmail
+      ? await UserModel.findByEmail(email)
+      : await UserModel.findByUsername(email);
+
     if (!user) {
       res.status(401).json({
         success: false,
-        message: 'Email ou mot de passe incorrect'
+        message: 'Identifiant ou mot de passe incorrect'
       });
       return;
     }
@@ -403,16 +392,13 @@ router.post('/forgot-password', async (req: Request, res: Response) => {
     // Envoyer l'email de reset
     try {
       await sendPasswordResetEmail(email, resetToken);
-      console.log('✅ Email de réinitialisation envoyé avec succès');
     } catch (emailError) {
       console.error('❌ Erreur envoi email reset:', emailError);
-      // Continue même si l'email échoue (pour le développement)
-      console.warn('⚠️ Email de réinitialisation non envoyé, mais token généré et sauvegardé');
-    }
-    
-    // En mode développement, afficher l'URL de reset
-    if (process.env.NODE_ENV !== 'production') {
-      logTestUrls(email, undefined, resetToken);
+      res.status(500).json({
+        success: false,
+        message: 'Erreur lors de l\'envoi de l\'email. Veuillez réessayer.'
+      });
+      return;
     }
 
     res.json({
@@ -430,27 +416,25 @@ router.post('/forgot-password', async (req: Request, res: Response) => {
 });
 
 // Route POST /reset-password/:token - Réinitialisation du mot de passe
-router.post('/reset-password/:token', async (req: Request, res: Response) => {
+router.post('/reset-password/:token', async (req: Request, res: Response): Promise<void> => {
   try {
     const { token } = req.params;
     const { password } = req.body;
-    
+
     if (!token || !password) {
-      res.status(400).json({
-        success: false,
-        message: 'Token et nouveau mot de passe requis'
-      });
+      res.status(400).json({ success: false, message: 'Token et nouveau mot de passe requis' });
       return;
     }
 
     // Valider le nouveau mot de passe
     const passwordErrors = validatePassword(password);
     if (passwordErrors.length > 0) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         message: 'Le nouveau mot de passe ne respecte pas les critères de sécurité.',
         errors: passwordErrors
       });
+      return;
     }
 
     // Vérifier le token
@@ -483,54 +467,6 @@ router.post('/reset-password/:token', async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       message: 'Erreur serveur lors de la réinitialisation'
-    });
-  }
-});
-
-// Routes /profile déplacées vers routes/profile.ts
-
-// Route de test pour debug du système de reset password (DEVELOPMENT UNIQUEMENT)
-router.get('/debug/reset-tokens', async (req: Request, res: Response) => {
-  try {
-    if (process.env.NODE_ENV === 'production') {
-      res.status(403).json({
-        success: false,
-        message: 'Route de debug non disponible en production'
-      });
-      return;
-    }
-    
-    const client = await pool.connect();
-    try {
-      const query = `
-        SELECT id, email, reset_password_token, reset_password_expires
-        FROM users 
-        WHERE reset_password_token IS NOT NULL 
-        ORDER BY reset_password_expires DESC
-        LIMIT 10
-      `;
-      const result = await client.query(query);
-      
-      res.json({
-        success: true,
-        message: 'Tokens de reset actifs (DEBUG)',
-        tokens: result.rows.map(row => ({
-          user_id: row.id,
-          email: row.email,
-          token: row.reset_password_token,
-          expires: row.reset_password_expires,
-          reset_url: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password/${row.reset_password_token}`
-        }))
-      });
-    } finally {
-      client.release();
-    }
-    
-  } catch (error) {
-    console.error('Erreur debug reset tokens:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Erreur serveur debug'
     });
   }
 });

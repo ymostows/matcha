@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Heart, Mail, Lock, User, Users, Loader2, CheckCircle, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, User, Users, CheckCircle, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -90,8 +90,8 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) =
       return false;
     }
     
-    if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.password)) {
-      setLocalError('Le mot de passe doit contenir au moins une minuscule, une majuscule et un chiffre');
+    if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^a-zA-Z0-9])/.test(formData.password)) {
+      setLocalError('Le mot de passe doit contenir au moins une minuscule, une majuscule, un chiffre et un caractère spécial');
       return false;
     }
 

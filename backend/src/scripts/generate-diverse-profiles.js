@@ -1,4 +1,5 @@
 const { Pool } = require('pg');
+const bcrypt = require('bcryptjs');
 
 require('dotenv').config();
 
@@ -89,9 +90,8 @@ function generateParisCoordinates() {
   return { lat, lng };
 }
 
-function hashPassword(password) {
-  // Simple hash for testing (in production, use bcrypt)
-  return '$2b$12$' + Buffer.from(password).toString('base64');
+async function hashPassword(password) {
+  return bcrypt.hash(password, 12);
 }
 
 function generateDiverseOrientations() {
@@ -143,7 +143,7 @@ async function generateDiverseProfiles(count = 100) {
           INSERT INTO users (email, username, password_hash, first_name, last_name, is_verified, created_at)
           VALUES ($1, $2, $3, $4, $5, true, NOW())
           RETURNING id
-        `, [email, username, hashPassword('TempPassword123!'), firstName, lastName]);
+        `, [email, username, await hashPassword('TempPassword123!'), firstName, lastName]);
         
         const userId = userResult.rows[0].id;
         

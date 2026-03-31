@@ -51,16 +51,33 @@ export const sanitizeInput = (req: Request, res: Response, next: NextFunction): 
   next();
 };
 
+// Vérifie les magic bytes réels du fichier pour confirmer son type
+function checkMagicBytes(buffer: Buffer): string | null {
+  if (!buffer || buffer.length < 12) return null;
+
+  // JPEG: FF D8 FF
+  if (buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF) return 'image/jpeg';
+  // PNG: 89 50 4E 47
+  if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47) return 'image/png';
+  // WebP: RIFF????WEBP
+  if (buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46 &&
+      buffer[8] === 0x57 && buffer[9] === 0x45 && buffer[10] === 0x42 && buffer[11] === 0x50) return 'image/webp';
+  // GIF87a / GIF89a
+  if (buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46) return 'image/gif';
+
+  return null;
+}
+
 // Middleware spécifique pour les uploads de fichiers
 export const validateFileUpload = (req: Request, res: Response, next: NextFunction): void => {
   const files = req.files as Express.Multer.File[];
-  
+
   if (files && files.length > 0) {
     const allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
     const maxFileSize = 5 * 1024 * 1024; // 5MB
-    
+
     for (const file of files) {
-      // Vérifier le type MIME
+      // Vérifier le type MIME déclaré par le client
       if (!allowedMimeTypes.includes(file.mimetype)) {
         res.status(400).json({
           success: false,
@@ -68,7 +85,7 @@ export const validateFileUpload = (req: Request, res: Response, next: NextFuncti
         });
         return;
       }
-      
+
       // Vérifier la taille
       if (file.size > maxFileSize) {
         res.status(400).json({
@@ -77,7 +94,7 @@ export const validateFileUpload = (req: Request, res: Response, next: NextFuncti
         });
         return;
       }
-      
+
       // Vérifier l'extension du fichier
       const allowedExtensions = ['.jpg', '.jpeg', '.png', '.webp'];
       const fileExtension = file.originalname.toLowerCase().split('.').pop();
@@ -88,8 +105,18 @@ export const validateFileUpload = (req: Request, res: Response, next: NextFuncti
         });
         return;
       }
+
+      // Vérifier les magic bytes réels du fichier (le client ne peut pas les falsifier)
+      const realType = checkMagicBytes(file.buffer);
+      if (!realType) {
+        res.status(400).json({
+          success: false,
+          message: 'Le fichier ne correspond pas à une image valide.'
+        });
+        return;
+      }
     }
   }
-  
+
   next();
 }; 

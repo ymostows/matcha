@@ -68,7 +68,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       const manager = new SocketManager({
         url: 'http://localhost:3001',
         auth: { token },
-        enableHeartbeat: true,
+        enableHeartbeat: false,  // Socket.io gère le heartbeat nativement, le custom cause des faux ping timeout
         heartbeatInterval: 30000,
         maxReconnectAttempts: 10,
         reconnectionDelay: 1000,

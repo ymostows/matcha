@@ -20,7 +20,7 @@
     "add:photos": "ts-node src/scripts/addPhotosToProfiles.ts",
     "verify:profiles": "ts-node src/scripts/verifyProfiles.ts",
     "seed:20": "npm run generate:test 20 && npm run add:photos",
-    "seed:500": "node src/scripts/generateProfiles.js",
+    "seed:500": "node src/scripts/generateProfiles.js 500",
     "reset:profiles": "npm run clean:complete && npm run seed:500",
     "setup:neon": "ts-node src/scripts/setup-neon-db.ts",
     "ts-node": "ts-node",

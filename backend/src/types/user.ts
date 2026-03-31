@@ -63,6 +63,9 @@ export interface CreateProfileData {
   sexual_orientation?: 'hetero' | 'homo' | 'bi';
   interests?: string[];
   city?: string;
+  location_lat?: number;
+  location_lng?: number;
+  public_city?: string;
 }
 
 // Type pour la mise à jour de profil
