@@ -62,8 +62,19 @@ const INTERESTS = [
 ];
 
 const CITIES = [
-  'Paris', 'Lyon', 'Marseille', 'Toulouse', 'Nice', 'Nantes', 'Strasbourg',
-  'Montpellier', 'Bordeaux', 'Lille', 'Rennes', 'Grenoble', 'Dijon'
+  { name: 'Paris',           lat: 48.8566,  lng:  2.3522 },
+  { name: 'Lyon',            lat: 45.7640,  lng:  4.8357 },
+  { name: 'Marseille',       lat: 43.2965,  lng:  5.3698 },
+  { name: 'Toulouse',        lat: 43.6047,  lng:  1.4442 },
+  { name: 'Nice',            lat: 43.7102,  lng:  7.2620 },
+  { name: 'Nantes',          lat: 47.2184,  lng: -1.5536 },
+  { name: 'Strasbourg',      lat: 48.5734,  lng:  7.7521 },
+  { name: 'Montpellier',     lat: 43.6108,  lng:  3.8767 },
+  { name: 'Bordeaux',        lat: 44.8378,  lng: -0.5792 },
+  { name: 'Lille',           lat: 50.6292,  lng:  3.0573 },
+  { name: 'Rennes',          lat: 48.1173,  lng: -1.6778 },
+  { name: 'Grenoble',        lat: 45.1885,  lng:  5.7245 },
+  { name: 'Dijon',           lat: 47.3220,  lng:  5.0415 },
 ];
 
 // Fonction pour créer une photo SVG avec initiales
@@ -269,7 +280,8 @@ async function generateProfiles(count = 10) {
         
         // Choisir une bio et une ville
         const bio = bios[Math.floor(Math.random() * bios.length)];
-        const city = CITIES[Math.floor(Math.random() * CITIES.length)];
+        const cityObj = CITIES[Math.floor(Math.random() * CITIES.length)];
+        const city = cityObj.name;
         
         // Déterminer l'orientation sexuelle
         const orientations = ['hetero', 'homo', 'bi'];
@@ -295,11 +307,9 @@ async function generateProfiles(count = 10) {
         
         await createProfile(user.id, profileData);
         
-        // Générer des coordonnées GPS (région parisienne)
-        const parisLat = 48.8566;
-        const parisLng = 2.3522;
-        const lat = parisLat + (Math.random() - 0.5) * 0.6;
-        const lng = parisLng + (Math.random() - 0.5) * 0.6;
+        // GPS coordinates near the selected city (±0.05°)
+        const lat = cityObj.lat + (Math.random() - 0.5) * 0.1;
+        const lng = cityObj.lng + (Math.random() - 0.5) * 0.1;
         
         await updateLocation(user.id, lat, lng);
         

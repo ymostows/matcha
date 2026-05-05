@@ -7,7 +7,7 @@ import { Textarea } from '../ui/textarea';
 import { UserUpdateData, ProfileData, profileApi } from '../../services/profileApi';
 import { FormField } from '../ui/form';
 
-const FALLBACK_INTERESTS = [
+const POPULAR_INTERESTS = [
   '🎵 Musique', '🎬 Cinéma', '📚 Lecture', '🏃‍♂️ Sport', '🎯 Gaming',
   '🍳 Cuisine', '✈️ Voyage', '🎨 Art', '📸 Photo', '🌿 Nature',
   '💃 Danse', '🎭 Théâtre', '🏔️ Randonnée', '🏊‍♀️ Natation', '🧘‍♀️ Yoga',
