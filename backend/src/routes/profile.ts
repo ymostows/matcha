@@ -1123,9 +1123,16 @@ router.post('/block', authenticateToken, async (req: Request, res: Response): Pr
 
       // Supprimer les matches
       await client.query(`
-        DELETE FROM matches 
+        DELETE FROM matches
         WHERE (user1_id = $1 AND user2_id = $2) OR (user1_id = $2 AND user2_id = $1)
       `, [Math.min(userId, targetUserId), Math.max(userId, targetUserId)]);
+
+      // Désactiver la conversation entre les deux utilisateurs
+      await client.query(`
+        UPDATE conversations
+        SET is_active = false
+        WHERE (user1_id = $1 AND user2_id = $2) OR (user1_id = $2 AND user2_id = $1)
+      `, [userId, targetUserId]);
 
       // Mettre à jour le fame rating des deux utilisateurs
       await updateFameRating(userId, client);

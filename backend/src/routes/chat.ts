@@ -80,7 +80,13 @@ router.get('/conversations', authenticateToken, async (req: Request, res: Respon
       FROM conversations c
       JOIN users u1 ON c.user1_id = u1.id
       JOIN users u2 ON c.user2_id = u2.id
-      WHERE (c.user1_id = $1 OR c.user2_id = $1) AND c.is_active = true
+      WHERE (c.user1_id = $1 OR c.user2_id = $1)
+        AND c.is_active = true
+        AND NOT EXISTS (
+          SELECT 1 FROM blocks b
+          WHERE (b.blocker_id = c.user1_id AND b.blocked_id = c.user2_id)
+             OR (b.blocker_id = c.user2_id AND b.blocked_id = c.user1_id)
+        )
       ORDER BY c.last_message_at DESC
     `;
 
@@ -198,9 +204,25 @@ router.post('/conversations/:conversationId/messages', authenticateToken, async 
     );
 
     if (conversationCheck.rows.length === 0) {
-      res.status(403).json({ 
-        success: false, 
-        message: 'Accès refusé à cette conversation ou conversation inactive' 
+      res.status(403).json({
+        success: false,
+        message: 'Accès refusé à cette conversation ou conversation inactive'
+      });
+      return;
+    }
+
+    // Vérifier qu'aucun des deux utilisateurs n'a bloqué l'autre
+    const conversation = conversationCheck.rows[0];
+    const otherUserId = conversation.user1_id === userId ? conversation.user2_id : conversation.user1_id;
+    const blockCheck = await pool.query(
+      'SELECT 1 FROM blocks WHERE (blocker_id = $1 AND blocked_id = $2) OR (blocker_id = $2 AND blocked_id = $1)',
+      [userId, otherUserId]
+    );
+
+    if (blockCheck.rows.length > 0) {
+      res.status(403).json({
+        success: false,
+        message: 'Impossible d\'envoyer un message à cet utilisateur'
       });
       return;
     }
@@ -257,8 +279,7 @@ router.post('/conversations/:conversationId/messages', authenticateToken, async 
     }
 
     // Créer une notification pour le destinataire
-    const conversation = conversationCheck.rows[0];
-    const recipientId = conversation.user1_id === userId ? conversation.user2_id : conversation.user1_id;
+    const recipientId = conversationCheck.rows[0].user1_id === userId ? conversationCheck.rows[0].user2_id : conversationCheck.rows[0].user1_id;
     
     // Obtenir le nom de l'expéditeur pour la notification
     const senderForNotif = await pool.query('SELECT first_name FROM users WHERE id = $1', [userId]);
