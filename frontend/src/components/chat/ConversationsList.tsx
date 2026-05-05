@@ -89,7 +89,6 @@ const ConversationsList: React.FC<ConversationsListProps> = ({ className = '' })
       const fetchedConversations = await chatApi.getConversations();
       setConversations(fetchedConversations);
     } catch (error) {
-      console.error('Erreur chargement conversations:', error);
       errorToast('Impossible de charger les conversations');
     } finally {
       setIsLoading(false);
@@ -110,7 +109,6 @@ const ConversationsList: React.FC<ConversationsListProps> = ({ className = '' })
           )
         );
       } catch (error) {
-        console.error('Erreur marquage messages lus:', error);
       }
     }
     

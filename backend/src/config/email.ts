@@ -14,7 +14,6 @@ const initializeEmailTransporter = async () => {
         pass: process.env.MAILTRAP_PASS,
       },
     });
-    console.log('📧 Email configuré via Mailtrap (boîte de réception : https://mailtrap.io)');
     return;
   }
 
@@ -30,11 +29,7 @@ const initializeEmailTransporter = async () => {
         pass: testAccount.pass,
       },
     });
-    console.log('📧 Email configuré via Ethereal (fallback dev)');
-    console.log('📧 Compte Ethereal :', testAccount.user);
-    console.log('📧 Consultez les emails sur : https://ethereal.email (connectez-vous avec ce compte)');
   } catch (error) {
-    console.error('❌ Impossible d\'initialiser le transporteur email :', error);
     throw error;
   }
 };
@@ -57,12 +52,10 @@ const sendEmail = async (options: EmailOptions): Promise<string> => {
     html: options.html,
   });
 
-  console.log('✅ Email envoyé :', info.messageId);
 
   // Affiche le lien de prévisualisation uniquement pour Ethereal
   const previewUrl = nodemailer.getTestMessageUrl(info);
   if (previewUrl) {
-    console.log('🔗 Aperçu Ethereal :', previewUrl);
   }
 
   return info.messageId;

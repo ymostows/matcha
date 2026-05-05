@@ -76,9 +76,7 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
     // Envoyer l'email de vérification
     try {
       await sendVerificationEmail(email, newUser.verification_token!);
-      console.log('✅ Email de vérification envoyé avec succès');
     } catch (emailError) {
-      console.error('❌ Erreur envoi email:', emailError);
       // Continue même si l'email échoue (pour le développement)
     }
     
@@ -99,7 +97,6 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
     });
     
   } catch (error: any) {
-    console.error('Erreur inscription:', error);
     res.status(500).json({
       success: false,
       message: 'Erreur serveur lors de l\'inscription'
@@ -184,7 +181,6 @@ router.get('/verify-email/:token', async (req: Request, res: Response) => {
     });
     
   } catch (error: any) {
-    console.error('Erreur vérification email:', error);
     res.status(500).json({
       success: false,
       message: 'Erreur serveur lors de la vérification'
@@ -231,7 +227,6 @@ router.post('/resend-verification', async (req: Request, res: Response) => {
     try {
       await sendVerificationEmail(email, newToken);
     } catch (emailError) {
-      console.error('Erreur envoi email:', emailError);
       res.status(500).json({
         success: false,
         message: 'Erreur lors de l\'envoi de l\'email'
@@ -245,7 +240,6 @@ router.post('/resend-verification', async (req: Request, res: Response) => {
     });
     
   } catch (error: any) {
-    console.error('Erreur renvoi vérification:', error);
     res.status(500).json({
       success: false,
       message: 'Erreur serveur'
@@ -338,7 +332,6 @@ router.post('/login', async (req: Request, res: Response) => {
     });
     
   } catch (error: any) {
-    console.error('Erreur connexion:', error);
     res.status(500).json({
       success: false,
       message: 'Erreur serveur lors de la connexion'
@@ -393,7 +386,6 @@ router.post('/forgot-password', async (req: Request, res: Response) => {
     try {
       await sendPasswordResetEmail(email, resetToken);
     } catch (emailError) {
-      console.error('❌ Erreur envoi email reset:', emailError);
       res.status(500).json({
         success: false,
         message: 'Erreur lors de l\'envoi de l\'email. Veuillez réessayer.'
@@ -407,7 +399,6 @@ router.post('/forgot-password', async (req: Request, res: Response) => {
     });
     
   } catch (error: any) {
-    console.error('Erreur forgot password:', error);
     res.status(500).json({
       success: false,
       message: 'Erreur serveur'
@@ -463,7 +454,6 @@ router.post('/reset-password/:token', async (req: Request, res: Response): Promi
     });
     
   } catch (error: any) {
-    console.error('Erreur reset password:', error);
     res.status(500).json({
       success: false,
       message: 'Erreur serveur lors de la réinitialisation'

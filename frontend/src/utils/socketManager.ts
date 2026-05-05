@@ -79,7 +79,6 @@ class SocketManager {
     this.status.connecting = true;
     this.status.error = null;
 
-    console.log('🔌 Connexion Socket.io...');
 
     try {
       this.socket = io(this.options.url, {
@@ -97,7 +96,6 @@ class SocketManager {
       this.setupSocketHandlers();
       
     } catch (error) {
-      console.error('🔌 Erreur création socket:', error);
       this.handleConnectionError(error);
     }
   }
@@ -109,17 +107,14 @@ class SocketManager {
     if (!this.socket) return;
 
     this.socket.on('connect', () => {
-      console.log('🔌 Socket.io connecté!');
       this.handleConnection();
     });
 
     this.socket.on('disconnect', (reason) => {
-      console.log('🔌 Socket.io déconnecté:', reason);
       this.handleDisconnection(reason);
     });
 
     this.socket.on('connect_error', (error) => {
-      console.error('🔌 Erreur de connexion Socket.io:', error);
       this.handleConnectionError(error);
     });
 
@@ -181,17 +176,14 @@ class SocketManager {
     this.status.connecting = false;
     this.status.error = error.message || 'Erreur de connexion';
 
-    console.error('🔌 Erreur connexion:', error);
 
     // Émettre l'événement d'erreur
     this.emitToHandlers('socket_error', error);
 
     // Si on n'a jamais réussi à se connecter et qu'on a fait trop de tentatives
     if (this.status.reconnectAttempts >= (this.options.maxReconnectAttempts || 10)) {
-      console.warn('🔌 Nombre maximum de tentatives de reconnexion atteint');
       
       if (this.options.enableFallbackPolling) {
-        console.log('🔄 Activation du fallback polling');
         this.startFallbackPolling();
       }
       
@@ -228,7 +220,6 @@ class SocketManager {
       30000 // Max 30 secondes
     );
 
-    console.log(`🔄 Reconnexion programmée dans ${delay}ms (tentative ${this.status.reconnectAttempts + 1})`);
 
     this.reconnectTimer = setTimeout(() => {
       if (!this.isDestroyed) {
@@ -263,7 +254,6 @@ class SocketManager {
         
         // Attendre le pong avec timeout
         const pongTimeout = setTimeout(() => {
-          console.warn('🔌 Pas de réponse au ping, reconnexion...');
           this.handleDisconnection('ping timeout');
         }, 5000);
 
@@ -293,7 +283,6 @@ class SocketManager {
       return;
     }
 
-    console.log('🔄 Démarrage du fallback polling HTTP');
     this.status.usingFallback = true;
     this.status.transportMethod = 'http';
 
@@ -301,7 +290,6 @@ class SocketManager {
       try {
         await this.pollForUpdates();
       } catch (error) {
-        console.warn('🔄 Erreur polling:', error);
       }
     }, this.options.pollingInterval);
 
@@ -392,7 +380,6 @@ class SocketManager {
       // En mode fallback, simuler certains événements via HTTP
       this.handleFallbackEmit(event, ...args);
     } else {
-      console.warn(`🔌 Impossible d'émettre ${event}: pas de connexion`);
     }
   }
 
@@ -418,10 +405,8 @@ class SocketManager {
           });
           break;
         default:
-          console.warn(`🔄 Événement ${event} non supporté en mode fallback`);
       }
     } catch (error) {
-      console.error(`🔄 Erreur fallback emit ${event}:`, error);
     }
   }
 
@@ -435,7 +420,6 @@ class SocketManager {
         try {
           handler(...args);
         } catch (error) {
-          console.error(`Erreur dans le handler ${event}:`, error);
         }
       });
     }
@@ -486,7 +470,6 @@ class SocketManager {
 
     this.eventHandlers.clear();
     
-    console.log('🔌 SocketManager détruit');
   }
 }
 

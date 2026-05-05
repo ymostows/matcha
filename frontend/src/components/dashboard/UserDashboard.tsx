@@ -43,7 +43,6 @@ export const UserDashboard: React.FC = () => {
         setStats(data.stats);
       }
     } catch (error) {
-      console.error('Erreur lors du rafraîchissement des statistiques:', error);
     }
   };
 
@@ -59,7 +58,6 @@ export const UserDashboard: React.FC = () => {
         await refreshStats();
         
       } catch (error) {
-        console.error('Erreur lors du chargement des données du dashboard:', error);
         // Garder les valeurs par défaut (0) en cas d'erreur
       }
     };

@@ -20,7 +20,6 @@ router.post('/', authenticateToken, upload.array('photos', 5), async (req: Reque
     // --- Amélioration : Vérifier si l'utilisateur existe ---
     const userExists = await UserModel.findById(userId);
     if (!userExists) {
-      console.warn(`Tentative d'upload de photo pour un utilisateur inexistant: userId=${userId}`);
       res.status(404).json({ success: false, message: 'Utilisateur non trouvé' });
       return;
     }
@@ -62,7 +61,6 @@ router.post('/', authenticateToken, upload.array('photos', 5), async (req: Reque
         
       } catch (error) {
         // --- Amélioration : Log plus détaillé ---
-        console.error(`Erreur lors de la sauvegarde d'une photo pour userId=${userId}:`, error);
         // On ne bloque pas les autres uploads, mais on pourrait vouloir le faire
       }
     }
@@ -73,7 +71,6 @@ router.post('/', authenticateToken, upload.array('photos', 5), async (req: Reque
       photos: savedPhotos
     });
   } catch (error) {
-    console.error('❌ Erreur upload:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Erreur serveur' 
@@ -99,7 +96,6 @@ router.delete('/:id', authenticateToken, async (req: Request, res: Response): Pr
       message: success ? 'Photo supprimée' : 'Photo non trouvée' 
     });
   } catch (error) {
-    console.error('Erreur suppression:', error);
     res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 });
@@ -122,7 +118,6 @@ router.put('/:id/profile-picture', authenticateToken, async (req: Request, res: 
       message: success ? 'Photo de profil mise à jour' : 'Échec mise à jour' 
     });
   } catch (error) {
-    console.error('Erreur photo de profil:', error);
     res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 });
@@ -165,7 +160,6 @@ router.get('/:id/image', async (req: Request, res: Response): Promise<void> => {
     res.setHeader('Content-Type', mimeType);
     res.send(buffer);
   } catch (error) {
-    console.error('Erreur service image:', error);
     res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 });

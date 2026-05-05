@@ -54,7 +54,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             setUser(updatedUser);
             storageManager.setObject('user', updatedUser);
           } catch (tokenError) {
-            console.warn('Token invalide, déconnexion:', tokenError);
             // Token invalide, nettoyer la session
             apiService.logout();
             storageManager.removeItem('token');
@@ -64,10 +63,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           }
         } else {
           // Pas de session sauvegardée
-          console.log('Aucune session trouvée');
         }
       } catch (error) {
-        console.error('Erreur lors de l\'initialisation:', error);
         setError('Erreur lors de l\'initialisation');
         
         // En cas d'erreur, nettoyer complètement
@@ -110,17 +107,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           // Sauvegarder avec le storageManager robuste
           const savedSuccessfully = storageManager.setObject('user', updatedUser);
           if (!savedSuccessfully) {
-            console.warn('Impossible de sauvegarder les données utilisateur');
             // Afficher une notification à l'utilisateur si nécessaire
           }
         } catch (profileError) {
           // En cas d'erreur, continuer avec les données utilisateur de base
-          console.warn('Impossible de charger les données du profil:', profileError);
           
           // Sauvegarder au moins les données de base
           const savedSuccessfully = storageManager.setObject('user', response.user);
           if (!savedSuccessfully) {
-            console.warn('Impossible de sauvegarder même les données utilisateur de base');
           }
         }
       } else {
@@ -188,7 +182,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Sauvegarder avec le storageManager robuste
       const savedSuccessfully = storageManager.setObject('user', updatedUser);
       if (!savedSuccessfully) {
-        console.warn('Impossible de sauvegarder les données utilisateur mises à jour');
       }
     } catch (error) {
     }

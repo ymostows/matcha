@@ -31,7 +31,6 @@ export const ReportedUsersList: React.FC<ReportedUsersListProps> = ({
       const users = await profileApi.getReportedUsers(limit);
       setReportedUsers(users);
     } catch (error) {
-      console.error('Erreur lors du chargement des utilisateurs signalés:', error);
       errorToast('Erreur lors du chargement des utilisateurs signalés');
     } finally {
       setIsLoading(false);

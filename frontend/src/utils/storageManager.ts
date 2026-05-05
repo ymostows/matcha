@@ -212,7 +212,6 @@ class StorageManager {
     try {
       return this.storage.getItem(key);
     } catch (e) {
-      console.warn(`StorageManager: Erreur lors de la lecture de ${key}:`, e);
       // Fallback vers le stockage en mémoire
       if (this.storage !== this.memoryStorage) {
         return this.memoryStorage.getItem(key);
@@ -239,7 +238,6 @@ class StorageManager {
       
       return true;
     } catch (e) {
-      console.warn(`StorageManager: Erreur lors de l'écriture de ${key}:`, e);
       
       // Fallback vers le stockage en mémoire
       if (this.storage !== this.memoryStorage) {
@@ -248,7 +246,6 @@ class StorageManager {
           this.limitations.usingMemoryFallback = true;
           return true;
         } catch (memError) {
-          console.error('StorageManager: Impossible de sauvegarder, même en mémoire:', memError);
         }
       }
       
@@ -263,7 +260,6 @@ class StorageManager {
     try {
       this.storage.removeItem(key);
     } catch (e) {
-      console.warn(`StorageManager: Erreur lors de la suppression de ${key}:`, e);
     }
 
     // Supprimer aussi du stockage en mémoire
@@ -281,7 +277,6 @@ class StorageManager {
     try {
       this.storage.clear();
     } catch (e) {
-      console.warn('StorageManager: Erreur lors du vidage du stockage:', e);
     }
 
     try {
@@ -299,7 +294,6 @@ class StorageManager {
       const jsonString = JSON.stringify(obj);
       return this.setItem(key, jsonString);
     } catch (e) {
-      console.warn(`StorageManager: Erreur lors de la sérialisation de ${key}:`, e);
       return false;
     }
   }
@@ -314,7 +308,6 @@ class StorageManager {
       
       return JSON.parse(jsonString) as T;
     } catch (e) {
-      console.warn(`StorageManager: Erreur lors de la désérialisation de ${key}:`, e);
       return null;
     }
   }

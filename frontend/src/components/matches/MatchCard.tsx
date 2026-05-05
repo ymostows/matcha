@@ -25,7 +25,6 @@ export const MatchCard: React.FC<MatchCardProps> = ({
       try {
         await onUnmatch(match.match_id);
       } catch (error) {
-        console.error('Erreur lors du unmatch:', error);
       }
     }
   };

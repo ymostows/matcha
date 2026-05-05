@@ -153,7 +153,6 @@ export class DistanceCalculator {
           distance_km = this.calculateDistance(referencePoint, point);
         }
       } catch (error) {
-        console.warn(`Erreur calcul distance pour point ${point.latitude}, ${point.longitude}:`, error);
         distance_km = null;
       }
 

@@ -87,7 +87,6 @@ app.get('/api/test-db', async (req, res) => {
       userCount: result.rows[0].count
     });
   } catch (error) {
-    console.error('Erreur DB:', error);
     res.status(500).json({
       status: 'ERROR',
       message: 'Erreur de connexion à la base de données'
@@ -125,27 +124,15 @@ const startServer = async () => {
     // Initialiser le transporteur email
     try {
       await initializeEmailTransporter();
-      console.log('📧 Service email initialisé avec succès');
     } catch (emailError) {
-      console.warn('⚠️ Avertissement: Service email non disponible, continuons sans email');
-      console.warn('📧 Les emails ne seront pas envoyés mais les fonctionnalités continueront de fonctionner');
     }
     
     // Initialiser Socket.io
     const socketService = initializeSocketService(httpServer);
-    console.log('🔌 Service Socket.io initialisé');
     
     httpServer.listen(PORT, () => {
-      console.log(`🚀 Serveur Matcha démarré sur http://localhost:${PORT}`);
-      console.log(`📡 Route de test : http://localhost:${PORT}/api/health`);
-      console.log(`🗄️ Test DB : http://localhost:${PORT}/api/test-db`);
-      console.log(`🔐 Auth routes : http://localhost:${PORT}/api/auth/*`);
-      console.log(`🔔 Notifications : http://localhost:${PORT}/api/notifications`);
-      console.log(`🔌 WebSocket temps réel activé !`);
-      console.log(`🗄️ Base de données connectée avec succès`);
     });
   } catch (error) {
-    console.error('❌ Erreur au démarrage du serveur:', error);
     process.exit(1);
   }
 };

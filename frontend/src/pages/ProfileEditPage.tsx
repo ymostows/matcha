@@ -34,7 +34,6 @@ export const ProfileEditPage: React.FC = () => {
         // S'assurer qu'on a un objet même en cas de données partielles
         setProfile(profileData || {});
       } catch (error) {
-        console.error('Erreur chargement profil pour édition:', error);
         setError('Impossible de charger votre profil. Vérifiez votre connexion.');
       } finally {
         setIsLoading(false);

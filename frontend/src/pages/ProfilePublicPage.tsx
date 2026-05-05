@@ -106,13 +106,9 @@ export const ProfilePublicPage: React.FC = () => {
       }
       
       // Debug logs temporaires
-      console.log('🔍 DEBUG ProfilePublic - Profil reçu:', profileData);
-      console.log('🔍 DEBUG ProfilePublic - Distance:', profileData.distance_km);
-      console.log('🔍 DEBUG ProfilePublic - Toutes les clés:', Object.keys(profileData));
       
       setProfile(profileData);
     } catch (err) {
-      console.error('Erreur lors du chargement du profil:', err);
       setErrorState('Profil non trouvé');
     } finally {
       setIsLoading(false);
@@ -207,7 +203,6 @@ export const ProfilePublicPage: React.FC = () => {
         }
       }
     } catch (err: any) {
-      console.error('Erreur lors du like:', err);
       const errorMessage = err.message || 'Erreur lors de l\'action';
       
       if (errorMessage.includes('photo')) {
@@ -251,7 +246,6 @@ export const ProfilePublicPage: React.FC = () => {
           closeDialog();
           navigate('/browsing'); // Rediriger vers la page de navigation
         } catch (err: any) {
-          console.error('Erreur lors du blocage:', err);
           const errorMessage = err.message || 'Erreur lors du blocage';
           errorToast(errorMessage);
         } finally {
@@ -279,7 +273,6 @@ export const ProfilePublicPage: React.FC = () => {
           success('Signalement enregistré avec succès. Merci de nous aider à maintenir la qualité de la communauté.');
           closePrompt();
         } catch (err: any) {
-          console.error('Erreur lors du signalement:', err);
           const errorMessage = err.message || 'Erreur lors du signalement';
           errorToast(errorMessage);
         } finally {

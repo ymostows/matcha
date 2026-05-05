@@ -60,7 +60,6 @@ class GeolocationManager {
           this.lastKnownPosition = gpsLocation;
           return gpsLocation;
         } catch (gpsError) {
-          console.warn('Géolocalisation GPS échouée:', gpsError);
           
           // Si fallback IP activé, essayer l'IP
           if (options.fallbackToIP !== false) {
@@ -69,7 +68,6 @@ class GeolocationManager {
               this.lastKnownPosition = ipLocation;
               return ipLocation;
             } catch (ipError) {
-              console.warn('Géolocalisation IP échouée:', ipError);
             }
           }
         }
@@ -153,7 +151,6 @@ class GeolocationManager {
               publicCity = reverseGeocode.city;
             }
           } catch (error) {
-            console.warn('Géocodage inversé échoué:', error);
           }
           
           resolve({
@@ -250,7 +247,6 @@ class GeolocationManager {
 
     for (const endpoint of apiEndpoints) {
       try {
-        console.log(`Tentative de géolocalisation IP avec: ${endpoint.url}`);
         
         const response = await fetch(endpoint.url, {
           method: 'GET',
@@ -280,7 +276,6 @@ class GeolocationManager {
           };
         }
       } catch (error) {
-        console.warn(`Endpoint ${endpoint.url} échoué:`, error);
         continue;
       }
     }
@@ -325,7 +320,6 @@ class GeolocationManager {
       
       return {};
     } catch (error) {
-      console.warn('Géocodage inversé échoué:', error);
       return {};
     }
   }
@@ -390,7 +384,6 @@ class GeolocationManager {
       };
       
     } catch (error) {
-      console.warn('Géocodage de ville échoué:', error);
       
       // Fallback : retourner avec coordonnées nulles
       return {

@@ -29,7 +29,6 @@ export const MatchesSection: React.FC<MatchesSectionProps> = ({
       const response = await profileApi.getMatches(limit, 0);
       setMatches(response.matches);
     } catch (error) {
-      console.error('Erreur lors du chargement des matches:', error);
       errorToast('Impossible de charger vos matches');
     } finally {
       setIsLoading(false);

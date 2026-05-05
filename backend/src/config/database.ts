@@ -19,12 +19,9 @@ const pool = new Pool({
 export const testConnection = async (): Promise<void> => {
   try {
     const client = await pool.connect();
-    console.log('✅ Connexion à PostgreSQL établie');
     const result = await client.query('SELECT NOW()');
-    console.log(`📅 Heure de la base de données: ${result.rows[0].now}`);
     client.release();
   } catch (error) {
-    console.error('❌ Erreur de connexion à PostgreSQL:', error);
     throw error;
   }
 };

@@ -45,7 +45,6 @@ export const LikesHistory: React.FC<LikesHistoryProps> = ({
       const likesData = await profileApi.getLikesHistory(limit);
       setLikes(likesData);
     } catch (error) {
-      console.error('Erreur lors du chargement de l\'historique des likes:', error);
       errorToast('Impossible de charger l\'historique des likes');
     } finally {
       setIsLoading(false);
@@ -74,7 +73,6 @@ export const LikesHistory: React.FC<LikesHistoryProps> = ({
       // Optionally refresh the data to show updated state
       // loadLikesHistory();
     } catch (error) {
-      console.error('Erreur lors du like:', error);
       errorToast('Impossible de liker ce profil');
     } finally {
       setLikeActions(prev => ({ ...prev, [userId]: false }));

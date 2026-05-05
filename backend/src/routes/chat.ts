@@ -87,14 +87,12 @@ router.get('/conversations', authenticateToken, async (req: Request, res: Respon
     const result = await pool.query(query, [userId]);
     
     // Log de debug pour voir les données
-    console.log('🔍 DEBUG - Conversations récupérées:', JSON.stringify(result.rows.slice(0, 2), null, 2));
     
     res.json({
       success: true,
       conversations: result.rows
     });
   } catch (error) {
-    console.error('Erreur récupération conversations:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Erreur serveur' 
@@ -155,7 +153,6 @@ router.get('/conversations/:conversationId/messages', authenticateToken, async (
       messages: result.rows.reverse() // Inverser pour avoir les plus anciens en premier
     });
   } catch (error) {
-    console.error('Erreur récupération messages:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Erreur serveur' 
@@ -251,9 +248,7 @@ router.post('/conversations/:conversationId/messages', authenticateToken, async 
           created_at: newMessage.created_at,
           sender_name: senderName
         });
-        console.log(`💬 Événement new_message émis pour conversation ${conversationId}`);
       } catch (socketError) {
-        console.error('Erreur émission événement Socket.io:', socketError);
         // Ne pas faire échouer la requête si Socket.io a un problème
       }
 
@@ -281,7 +276,6 @@ router.post('/conversations/:conversationId/messages', authenticateToken, async 
     );
 
   } catch (error) {
-    console.error('Erreur envoi message:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Erreur serveur' 
@@ -351,7 +345,6 @@ router.put('/conversations/:conversationId/read', authenticateToken, async (req:
         messageIds: updatedMessages.rows.map(m => m.id)
       });
 
-      console.log(`📖 ${updatedMessages.rows.length} messages marqués comme lus dans conversation ${conversationId}`);
       
       // Supprimer les notifications de messages de cette conversation pour l'utilisateur
       await pool.query(`
@@ -364,11 +357,9 @@ router.put('/conversations/:conversationId/read', authenticateToken, async (req:
       `, [userId, conversationId.toString()]);
       
     } catch (socketError) {
-      console.error('Erreur émission événement messages lus:', socketError);
     }
 
   } catch (error) {
-    console.error('Erreur marquer messages lus:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Erreur serveur' 
@@ -444,7 +435,6 @@ router.get('/conversations/:userId/start', authenticateToken, async (req: Reques
     });
 
   } catch (error) {
-    console.error('Erreur démarrage conversation:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Erreur serveur' 

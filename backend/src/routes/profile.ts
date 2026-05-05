@@ -36,7 +36,6 @@ router.get('/', authenticateToken, async (req: AuthenticatedRequest, res: Respon
       profile 
     });
   } catch (error) {
-    console.error('Erreur récupération profil:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Erreur serveur' 
@@ -54,8 +53,6 @@ router.put('/', authenticateToken, async (req: Request, res: Response): Promise<
     const validationErrors = validateProfileData(profileData);
     if (validationErrors.length > 0) {
       // --- Log de débogage ---
-      console.error('❌ Échec de la validation du profil. Données reçues:', JSON.stringify(profileData, null, 2));
-      console.error('Erreurs de validation:', validationErrors);
       // --- Fin du log ---
       res.status(400).json({ 
         success: false, 
@@ -72,7 +69,6 @@ router.put('/', authenticateToken, async (req: Request, res: Response): Promise<
       profile: updatedProfile 
     });
   } catch (error) {
-    console.error('Erreur mise à jour profil:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Erreur serveur' 
@@ -127,7 +123,6 @@ router.post('/complete', authenticateToken, async (req: Request, res: Response):
       profile: updatedProfile 
     });
   } catch (error) {
-    console.error('Erreur completion profil:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Erreur serveur' 
@@ -176,7 +171,6 @@ router.put('/user', authenticateToken, async (req: Request, res: Response): Prom
       message: 'Informations utilisateur mises à jour avec succès' 
     });
   } catch (error) {
-    console.error('Erreur mise à jour utilisateur:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Erreur serveur' 
@@ -237,7 +231,6 @@ function validateProfileData(data: any): string[] {
       }
       
       // Logs de debug pour tracer les coordonnées reçues
-      console.log(`📍 Coordonnées GPS reçues: ${data.location_lat}, ${data.location_lng}`);
     }
   }
 
@@ -298,7 +291,6 @@ router.put('/location/update-public-city', authenticateToken, async (req: Reques
       profile: updatedProfile 
     });
   } catch (error) {
-    console.error('Erreur mise à jour ville publique:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Erreur serveur' 
@@ -540,41 +532,9 @@ router.get('/browse', authenticateToken, async (req: Request, res: Response): Pr
 
     // Logs de debug pour le développement
     if (process.env.NODE_ENV === 'development') {
-      console.log('🔍 RAW QUERY DEBUG:', JSON.stringify(req.query, null, 2));
-      console.log('📊 Browse profiles debug:', {
-        currentUser: {
-          id: userId,
-          location: currentUserProfile.location_lat && currentUserProfile.location_lng ? 
-            `${currentUserProfile.location_lat}, ${currentUserProfile.location_lng}` : 'No GPS',
-          city: currentUserProfile.city
-        },
-        filters: {
-          sortBy, sortOrder, ageMin, ageMax, maxDistance, 
-          minFameRating, maxFameRating, commonTags, cities
-        },
-        sqlParams: {
-          userInterests: userInterests,
-          userCoordinates: `${currentUserProfile.location_lat || 'null'}, ${currentUserProfile.location_lng || 'null'}`,
-          parametersCount: params.length
-        },
-        rawQuery: {
-          commonTags: req.query.commonTags,
-          cities: req.query.cities,
-          isCommonTagsArray: Array.isArray(req.query.commonTags),
-          isCitiesArray: Array.isArray(req.query.cities)
-        }
-      });
       const normalizedTagsForDebug = commonTags.map(tag => tag.trim());
-      console.log('✅ PROCESSED ARRAYS:', {
-        commonTagsLength: commonTags.length,
-        commonTagsContent: commonTags,
-        normalizedTagsContent: normalizedTagsForDebug,
-        citiesLength: cities.length,
-        citiesContent: cities
-      });
       
       // Afficher les premiers 500 caractères de la requête SQL générée
-      console.log('🔍 SQL Query preview:', query.substring(0, 500) + '...');
     }
 
     const result = await pool.query(query, params);
@@ -582,11 +542,9 @@ router.get('/browse', authenticateToken, async (req: Request, res: Response): Pr
     // Logs des résultats pour debug
     if (process.env.NODE_ENV === 'development') {
       const profilesWithDistance = result.rows.filter(p => p.distance_km && p.distance_km < 999999);
-      console.log(`📍 Distance calculations: ${profilesWithDistance.length}/${result.rows.length} profiles with valid distances`);
       
       if (profilesWithDistance.length > 0) {
         const distances = profilesWithDistance.map(p => p.distance_km).sort((a, b) => a - b);
-        console.log(`📏 Distance range: ${distances[0]}km - ${distances[distances.length - 1]}km`);
       }
     }
     
@@ -597,7 +555,6 @@ router.get('/browse', authenticateToken, async (req: Request, res: Response): Pr
     });
 
   } catch (error) {
-    console.error('Erreur récupération profils:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Erreur serveur' 
@@ -678,7 +635,6 @@ router.get('/matches', authenticateToken, async (req: AuthenticatedRequest, res:
     });
 
   } catch (error) {
-    console.error('Erreur récupération matches:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Erreur serveur' 
@@ -749,7 +705,6 @@ router.delete('/matches/:matchId', authenticateToken, async (req: AuthenticatedR
     }
 
   } catch (error) {
-    console.error('Erreur suppression match:', error);
     res.status(500).json({
       success: false,
       message: 'Erreur serveur'
@@ -892,7 +847,6 @@ router.post('/like', authenticateToken, async (req: Request, res: Response): Pro
     }
 
   } catch (error) {
-    console.error('Erreur like profil:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Erreur serveur' 
@@ -912,7 +866,6 @@ router.get('/liked', authenticateToken, async (req: AuthenticatedRequest, res: R
     
     // Vérification basique de userId
     if (!userId) {
-      console.error('userId manquant dans /liked');
       res.status(400).json({
         success: false,
         message: 'ID utilisateur invalide'
@@ -957,7 +910,6 @@ router.get('/liked', authenticateToken, async (req: AuthenticatedRequest, res: R
     });
 
   } catch (error) {
-    console.error('Erreur récupération profils likés:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Erreur serveur' 
@@ -1054,7 +1006,6 @@ router.delete('/like/:userId', authenticateToken, async (req: Request, res: Resp
     }
 
   } catch (error) {
-    console.error('Erreur suppression like:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Erreur serveur' 
@@ -1093,7 +1044,6 @@ router.get('/history/likes', authenticateToken, async (req: Request, res: Respon
       likes: result.rows
     });
   } catch (error) {
-    console.error('Erreur récupération historique likes:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Erreur serveur' 
@@ -1127,7 +1077,6 @@ router.get('/history/visits', authenticateToken, async (req: Request, res: Respo
       visits: result.rows
     });
   } catch (error) {
-    console.error('Erreur récupération historique visites:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Erreur serveur' 
@@ -1190,7 +1139,6 @@ router.post('/block', authenticateToken, async (req: Request, res: Response): Pr
       client.release();
     }
   } catch (error) {
-    console.error('Erreur blocage utilisateur:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Erreur serveur' 
@@ -1230,7 +1178,6 @@ router.post('/report', authenticateToken, async (req: Request, res: Response): P
       message: 'Signalement enregistré avec succès'
     });
   } catch (error) {
-    console.error('Erreur signalement utilisateur:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Erreur serveur' 
@@ -1260,7 +1207,6 @@ router.get('/blocked', authenticateToken, async (req: Request, res: Response): P
 
     res.json({ success: true, blocked: result.rows });
   } catch (error) {
-    console.error('Erreur liste bloqués:', error);
     res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 });
@@ -1284,7 +1230,6 @@ router.delete('/block/:userId', authenticateToken, async (req: Request, res: Res
 
     res.json({ success: true, message: 'Utilisateur débloqué' });
   } catch (error) {
-    console.error('Erreur déblocage:', error);
     res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 });
@@ -1311,7 +1256,6 @@ router.get('/reported', authenticateToken, async (req: Request, res: Response): 
 
     res.json({ success: true, reported: result.rows });
   } catch (error) {
-    console.error('Erreur liste signalés:', error);
     res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 });
@@ -1348,7 +1292,6 @@ async function updateFameRating(userId: number, client: any): Promise<void> {
     `, [fameRating, userId]);
 
   } catch (error) {
-    console.error('Erreur mise à jour fame rating:', error);
   }
 }
 
@@ -1458,7 +1401,6 @@ if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
 
       // Logs détaillés si demandé
       if (debugMode === 'true') {
-        console.log('🔍 Debug calcul de distance:', JSON.stringify(debugInfo, null, 2));
       }
       
       res.json({
@@ -1467,7 +1409,6 @@ if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
         timestamp: new Date().toISOString()
       });
     } catch (error) {
-      console.error('Erreur route debug distance:', error);
       res.status(500).json({ 
         success: false, 
         message: 'Erreur serveur lors du debug' 
@@ -1526,7 +1467,6 @@ if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
         timestamp: new Date().toISOString()
       });
     } catch (error) {
-      console.error('Erreur validation coordonnées:', error);
       res.status(500).json({ 
         success: false, 
         message: 'Erreur serveur lors de la validation' 
@@ -1566,7 +1506,6 @@ router.get('/tags/suggestions', authenticateToken, async (req: Request, res: Res
       }))
     });
   } catch (error) {
-    console.error('Erreur suggestions tags:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Erreur serveur' 
@@ -1603,7 +1542,6 @@ router.get('/cities/suggestions', authenticateToken, async (req: Request, res: R
       }))
     });
   } catch (error) {
-    console.error('Erreur suggestions villes:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Erreur serveur' 
@@ -1617,7 +1555,6 @@ router.post('/migrate-coordinates', authenticateToken, async (req: Request, res:
     const userId = (req as any).user.userId;
     
     // Vérifier si c'est un admin ou pour des tests (optionnel)
-    console.log(`🔄 Migration des coordonnées demandée par l'utilisateur ${userId}`);
     
     // Trouver tous les profils sans coordonnées GPS valides
     const profilesQuery = await pool.query(`
@@ -1644,14 +1581,11 @@ router.post('/migrate-coordinates', authenticateToken, async (req: Request, res:
             WHERE user_id = $3
           `, [coordinates.latitude, coordinates.longitude, profile.user_id]);
           
-          console.log(`✅ Migré: ${profile.city} -> ${coordinates.latitude}, ${coordinates.longitude}`);
           migratedCount++;
         } else {
-          console.log(`❌ Échec migration: ${profile.city}`);
           failedCount++;
         }
       } catch (error) {
-        console.error(`Erreur migration profil ${profile.user_id}:`, error);
         failedCount++;
       }
     }
@@ -1664,7 +1598,6 @@ router.post('/migrate-coordinates', authenticateToken, async (req: Request, res:
     });
     
   } catch (error) {
-    console.error('Erreur migration coordonnées:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Erreur serveur lors de la migration' 
@@ -1719,7 +1652,6 @@ router.post('/geocode-city', authenticateToken, async (req: Request, res: Respon
       });
     }
   } catch (error) {
-    console.error('Erreur géocodage ville:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Erreur serveur lors de la géolocalisation' 
@@ -1816,7 +1748,6 @@ router.get('/:userId', authenticateToken, async (req: Request, res: Response): P
 
     res.json({ success: true, profile });
   } catch (error) {
-    console.error('Erreur récupération profil:', error);
     res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 });

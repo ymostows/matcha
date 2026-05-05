@@ -43,7 +43,6 @@ export async function createNotification(
         [userId, actorId]
       );
       if (blockCheck.rows.length > 0) {
-        console.log(`🚫 Notification supprimée (blocage) entre ${actorId} et ${userId}`);
         return;
       }
     }
@@ -55,15 +54,12 @@ export async function createNotification(
       message,
       data
     });
-    console.log(`🔔 Notification envoyée pour user ${userId}: ${message}`);
   } catch (socketError) {
-    console.log('⚠️ Service Socket.io non disponible, utilisation fallback DB');
     // Fallback: sauvegarder en base sans temps réel
     await pool.query(`
       INSERT INTO notifications (user_id, type, message, data, is_read, created_at)
       VALUES ($1, $2, $3, $4, false, CURRENT_TIMESTAMP)
     `, [userId, type, message, JSON.stringify(data)]);
-    console.log(`✅ Notification DB créée pour user ${userId}: ${message}`);
   }
 }
 
@@ -97,7 +93,6 @@ router.get('/', authenticateToken, async (req: Request, res: Response): Promise<
           try {
             return JSON.parse(row.data);
           } catch (e) {
-            console.warn('Erreur parsing JSON data:', row.data);
             return null;
           }
         }
@@ -111,7 +106,6 @@ router.get('/', authenticateToken, async (req: Request, res: Response): Promise<
       total: result.rows.length
     });
   } catch (error) {
-    console.error('Erreur récupération notifications:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Erreur serveur' 
@@ -152,7 +146,6 @@ router.put('/:id/read', authenticateToken, async (req: Request, res: Response): 
       message: 'Notification marquée comme lue'
     });
   } catch (error) {
-    console.error('Erreur mise à jour notification:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Erreur serveur' 
@@ -176,7 +169,6 @@ router.put('/read-all', authenticateToken, async (req: Request, res: Response): 
       message: 'Toutes les notifications marquées comme lues'
     });
   } catch (error) {
-    console.error('Erreur mise à jour notifications:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Erreur serveur' 
@@ -200,7 +192,6 @@ router.get('/unread-count', authenticateToken, async (req: Request, res: Respons
       count: parseInt(result.rows[0].count)
     });
   } catch (error) {
-    console.error('Erreur récupération count notifications:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Erreur serveur' 

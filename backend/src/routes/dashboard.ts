@@ -39,7 +39,6 @@ router.get('/stats', authenticateToken, async (req: Request, res: Response): Pro
       }
     });
   } catch (error) {
-    console.error('Erreur récupération stats dashboard:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Erreur serveur' 

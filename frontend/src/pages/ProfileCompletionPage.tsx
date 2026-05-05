@@ -63,7 +63,6 @@ export const ProfileCompletionPage: React.FC = () => {
         // Bisexuel par défaut si non spécifié (consigne cahier des charges)
         setProfile({ sexual_orientation: 'bi', ...(profileData || {}) });
       } catch (error) {
-        console.warn('Erreur chargement profil:', error);
         // Garder un objet avec les champs de base au lieu d'objet vide
         setProfile({
           sexual_orientation: 'bi',

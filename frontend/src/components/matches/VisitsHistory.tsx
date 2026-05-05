@@ -30,7 +30,6 @@ export const VisitsHistory: React.FC<VisitsHistoryProps> = ({
       const data = await profileApi.getVisitsHistory(limit);
       setVisits(data);
     } catch (error) {
-      console.error('Erreur lors du chargement de l\'historique des visites:', error);
     } finally {
       setIsLoading(false);
       setIsInitialized(true);

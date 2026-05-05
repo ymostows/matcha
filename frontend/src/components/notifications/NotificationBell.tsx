@@ -101,7 +101,6 @@ export const NotificationBell: React.FC = () => {
         refreshNotifications();
       }
     } catch (error) {
-      console.error('Erreur marquage toutes notifications:', error);
     }
   };
 

@@ -32,7 +32,6 @@ export const BlockedUsersList: React.FC<BlockedUsersListProps> = ({
       const users = await profileApi.getBlockedUsers(limit);
       setBlockedUsers(users);
     } catch (error) {
-      console.error('Erreur lors du chargement des utilisateurs bloqués:', error);
       errorToast('Erreur lors du chargement des utilisateurs bloqués');
     } finally {
       setIsLoading(false);
@@ -47,7 +46,6 @@ export const BlockedUsersList: React.FC<BlockedUsersListProps> = ({
       // Retirer l'utilisateur de la liste
       setBlockedUsers(prev => prev.filter(user => user.blocked_id !== userId));
     } catch (error) {
-      console.error('Erreur lors du déblocage:', error);
       errorToast('Erreur lors du déblocage de l\'utilisateur');
     } finally {
       setUnblockingUserId(null);

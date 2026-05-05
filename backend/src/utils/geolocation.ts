@@ -58,7 +58,6 @@ export class GeolocationService {
       const data = await this.makeRequest(url);
       
       if (data.error || !data.latitude || !data.longitude) {
-        console.warn('Erreur géolocalisation IP:', data.error || 'Données manquantes');
         return null;
       }
       
@@ -72,7 +71,6 @@ export class GeolocationService {
       };
       
     } catch (error) {
-      console.error('Erreur lors de la géolocalisation par IP:', error);
       return null;
     }
   }
@@ -88,7 +86,6 @@ export class GeolocationService {
       const data = await this.makeRequest(url);
       
       if (data.status !== 'success' || !data.lat || !data.lon) {
-        console.warn('Erreur géolocalisation IP fallback:', data.message || 'Données manquantes');
         return null;
       }
       
@@ -102,7 +99,6 @@ export class GeolocationService {
       };
       
     } catch (error) {
-      console.error('Erreur lors de la géolocalisation par IP (fallback):', error);
       return null;
     }
   }

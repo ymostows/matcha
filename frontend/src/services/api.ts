@@ -90,11 +90,9 @@ class ApiService {
       if (tokenSaved) {
         this.authToken = response.token;
       } else {
-        console.warn('Impossible de sauvegarder le token d\'authentification');
       }
       
       if (!userSaved) {
-        console.warn('Impossible de sauvegarder les données utilisateur');
       }
     }
 
@@ -132,7 +130,6 @@ class ApiService {
     try {
       return storageManager.getObject<User>('user');
     } catch (error) {
-      console.warn('Erreur lors de la récupération des données utilisateur:', error);
       return null;
     }
   }

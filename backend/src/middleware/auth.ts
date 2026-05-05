@@ -28,7 +28,6 @@ export const authenticateToken = (req: AuthenticatedRequest, res: Response, next
     const JWT_SECRET = process.env.JWT_SECRET;
     
     if (!JWT_SECRET) {
-      console.error('JWT_SECRET non configuré');
       res.status(500).json({ 
         success: false,
         message: 'Erreur de configuration du serveur' 
@@ -61,7 +60,6 @@ export const authenticateToken = (req: AuthenticatedRequest, res: Response, next
     }
     
     // Erreur inattendue
-    console.error('Erreur lors de la vérification du token:', error);
     res.status(500).json({ 
       success: false,
       message: 'Erreur serveur lors de la vérification du token' 

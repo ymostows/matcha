@@ -19,17 +19,13 @@ export class ProfileModel {
       // Si on n'a pas de coordonnées GPS mais qu'on a une ville, essayer de la géolocaliser
       if ((!finalLat || !finalLng || (finalLat === 0 && finalLng === 0)) && profileData.city) {
         try {
-          console.log(`🌍 Tentative de géolocalisation pour la ville: ${profileData.city}`);
           const coordinates = await GeocodingService.geocodeCity(profileData.city);
           if (coordinates && coordinates.latitude !== 0 && coordinates.longitude !== 0) {
             finalLat = coordinates.latitude;
             finalLng = coordinates.longitude;
-            console.log(`✅ Ville géolocalisée: ${profileData.city} -> ${finalLat}, ${finalLng}`);
           } else {
-            console.log(`❌ Impossible de géolocaliser: ${profileData.city}`);
           }
         } catch (error) {
-          console.warn('Échec du géocodage automatique de la ville:', error);
         }
       }
 
@@ -41,7 +37,6 @@ export class ProfileModel {
             longitude: finalLng
           });
         } catch (error) {
-          console.warn('Échec du géocodage lors de la création du profil:', error);
           publicCity = profileData.city || 'Localisation non disponible';
         }
       }
@@ -250,7 +245,6 @@ export class ProfileModel {
           longitude: currentProfile.location_lng
         });
       } catch (error) {
-        console.warn('Échec du géocodage lors de la mise à jour:', error);
         publicCity = currentProfile.city || 'Localisation non disponible';
       }
 

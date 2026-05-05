@@ -10,14 +10,6 @@ const errorHandler = (err: AppError, req: Request, res: Response, next: NextFunc
   err.message = err.message || 'Erreur Interne du Serveur';
 
   // Log de l'erreur pour le débogage (peut être étendu avec un logger comme Winston)
-  console.error('💥 ERREUR NON GÉRÉE 💥', {
-    timestamp: new Date().toISOString(),
-    path: req.path,
-    method: req.method,
-    statusCode: err.statusCode,
-    message: err.message,
-    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
-  });
 
   // Pour les erreurs opérationnelles (ex: validation, etc.), on envoie le message au client
   if (err.isOperational) {

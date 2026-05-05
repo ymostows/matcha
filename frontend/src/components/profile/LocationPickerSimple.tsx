@@ -152,7 +152,6 @@ export const LocationPickerSimple: React.FC<LocationPickerSimpleProps> = ({
         setStatus(`Ville définie : ${cleanCity} (sans coordonnées GPS)`);
       }
     } catch (error) {
-      console.warn('Erreur géolocalisation automatique:', error);
       setLocation(null);
       setStatus(`Ville définie : ${cleanCity} (sans coordonnées GPS)`);
     }

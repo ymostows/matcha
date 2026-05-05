@@ -100,7 +100,6 @@ export class GeocodingService {
         return result;
       }
     } catch (error) {
-      console.warn('Échec géocodage inversé Nominatim:', error);
     }
 
     // Fallback : approximation basée sur les coordonnées
@@ -221,7 +220,6 @@ export class GeocodingService {
         return coordinates;
       }
     } catch (error) {
-      console.warn('Échec géocodage ville Nominatim:', error);
     }
 
     // Fallback : chercher dans notre base de villes connues
@@ -365,7 +363,6 @@ export class GeocodingService {
       // Toujours retourner la ville formatée (pas de confidentialité)
       return result.formatted;
     } catch (error) {
-      console.error('Erreur lors de l\'obtention du nom de ville:', error);
       return 'Localisation non disponible';
     }
   }

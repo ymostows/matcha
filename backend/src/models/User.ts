@@ -46,12 +46,10 @@ export class UserModel {
           [newUser.id]
         );
       } catch (profileError) {
-        console.warn('Erreur création profil (non critique):', profileError);
       }
       
       return newUser;
     } catch (error) {
-      console.error('Erreur UserModel.create:', error);
       throw error;
     }
   }
@@ -64,7 +62,6 @@ export class UserModel {
       
       return result.rows[0] || null;
     } catch (error) {
-      console.error('Erreur UserModel.findByEmail:', error);
       throw error;
     }
   }
@@ -77,7 +74,6 @@ export class UserModel {
       
       return result.rows[0] || null;
     } catch (error) {
-      console.error('Erreur UserModel.findByUsername:', error);
       throw error;
     }
   }
@@ -90,7 +86,6 @@ export class UserModel {
       
       return result.rows[0] || null;
     } catch (error) {
-      console.error('Erreur UserModel.findById:', error);
       throw error;
     }
   }
@@ -100,7 +95,6 @@ export class UserModel {
     try {
       return await bcrypt.compare(plainPassword, hashedPassword);
     } catch (error) {
-      console.error('Erreur UserModel.verifyPassword:', error);
       return false;
     }
   }

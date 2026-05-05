@@ -235,11 +235,7 @@ const BrowsingPage: React.FC = () => {
       });
       
       // Debug logs temporaires
-      console.log('🔍 DEBUG - Profils reçus:', fetchedProfiles.length);
       if (fetchedProfiles.length > 0) {
-        console.log('🔍 DEBUG - Premier profil:', fetchedProfiles[0]);
-        console.log('🔍 DEBUG - Distance du premier profil:', fetchedProfiles[0].distance_km);
-        console.log('🔍 DEBUG - Toutes les clés du premier profil:', Object.keys(fetchedProfiles[0]));
       }
       
       setProfiles(fetchedProfiles);
@@ -362,7 +358,6 @@ const BrowsingPage: React.FC = () => {
       // Retirer le profil de la liste SEULEMENT si le like a réussi
       setProfiles(prev => prev.filter(p => p.user_id !== userId));
     } catch (err: any) {
-      console.error('Erreur lors du like:', err);
       // Afficher l'erreur à l'utilisateur
       const errorMessage = err.message || 'Erreur lors du like';
       
@@ -406,7 +401,6 @@ const BrowsingPage: React.FC = () => {
       // Retirer le profil de la liste SEULEMENT si l'unlike a réussi
       setProfiles(prev => prev.filter(p => p.user_id !== userId));
     } catch (err: any) {
-      console.error('Erreur lors de l\'unlike:', err);
       const errorMessage = err.message || 'Erreur lors de l\'annulation du like';
       errorToast(errorMessage);
       // Ne pas retirer le profil de la liste en cas d'erreur

@@ -79,7 +79,6 @@ export const BrowserDiagnostics: React.FC<BrowserDiagnosticsProps> = ({
 
       setDiagnostics(results);
     } catch (error) {
-      console.error('Erreur lors du diagnostic:', error);
       results.push({
         category: 'Général',
         name: 'Erreur de diagnostic',

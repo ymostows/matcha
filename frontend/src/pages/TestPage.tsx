@@ -214,7 +214,6 @@ const TestPage: React.FC = () => {
       });
 
     } catch (error) {
-      console.error('Erreur lors des tests:', error);
     } finally {
       setIsRunning(false);
     }

@@ -63,7 +63,6 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   // Connexion Socket.io avec le SocketManager résilient
   useEffect(() => {
     if (token && user) {
-      console.log('🔌 Initialisation SocketManager...');
       
       const manager = new SocketManager({
         url: 'http://localhost:3001',
@@ -78,42 +77,35 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
 
       // Écouter les événements de connexion
       const cleanupConnected = manager.on('socket_connected', () => {
-        console.log('🔌 SocketManager connecté!');
         setIsConnected(true);
         refreshNotifications();
       });
 
       const cleanupDisconnected = manager.on('socket_disconnected', (reason) => {
-        console.log('🔌 SocketManager déconnecté:', reason);
         setIsConnected(false);
       });
 
       const cleanupError = manager.on('socket_error', (error) => {
-        console.error('🔌 Erreur SocketManager:', error);
         setIsConnected(false);
       });
 
       const cleanupFallback = manager.on('fallback_polling_started', () => {
-        console.log('🔄 Fallback polling activé');
         // Optionnel : notifier l'utilisateur que le chat fonctionne en mode dégradé
       });
 
       // Événements de notifications avec le SocketManager
       const cleanupNewNotification = manager.on('new_notification', (notification: Notification) => {
-        console.log('🔔 Nouvelle notification reçue:', notification);
         setNotifications(prev => [notification, ...prev]);
         setUnreadCount(prev => prev + 1);
       });
 
       // Événements de messages avec le SocketManager
       const cleanupNewMessage = manager.on('new_message', (message: any) => {
-        console.log('💬 Nouveau message reçu:', message);
         messageCallbacks.current.forEach(callback => callback(message));
         updateUnreadMessageCount();
       });
 
       const cleanupMessageRead = manager.on('message_read', (data: any) => {
-        console.log('👁️ Message lu:', data);
         messageReadCallbacks.current.forEach(callback => callback(data));
       });
 
@@ -146,18 +138,15 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
 
       // Événements de typing avec le SocketManager
       const cleanupUserTyping = manager.on('user_typing', (data: { userId: number; username: string }) => {
-        console.log('⌨️ Utilisateur en train de taper:', data);
         typingCallbacks.current.forEach(callback => callback(data));
       });
 
       const cleanupUserStopTyping = manager.on('user_stop_typing', (data: { userId: number; username: string }) => {
-        console.log('⌨️ Utilisateur a arrêté de taper:', data);
         stopTypingCallbacks.current.forEach(callback => callback(data));
       });
 
       // Événements de statut en ligne avec le SocketManager
       const cleanupUserOnline = manager.on('user_online', (user: OnlineUser) => {
-        console.log('🟢 Utilisateur en ligne:', user);
         setOnlineUsers(prev => {
           if (!prev.find(u => u.userId === user.userId)) {
             return [...prev, user];
@@ -167,7 +156,6 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       });
 
       const cleanupUserOffline = manager.on('user_offline', (user: OnlineUser) => {
-        console.log('🔴 Utilisateur hors ligne:', user);
         setOnlineUsers(prev => prev.filter(u => u.userId !== user.userId));
       });
 
@@ -191,7 +179,6 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       manager.connect();
 
       return () => {
-        console.log('🔌 Nettoyage SocketManager');
         // Nettoyer tous les handlers
         cleanupConnected();
         cleanupDisconnected();
@@ -256,17 +243,14 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
         const unread = newNotifications.filter((notif: Notification) => !notif.is_read).length;
         setUnreadCount(unread);
       } else {
-        console.error('🔔 Erreur API notifications:', response.status);
       }
     } catch (error) {
-      console.error('🔔 Erreur chargement notifications:', error);
     }
   };
 
   const sendMessage = () => {
     // L'envoi de messages se fait maintenant via l'API REST
     // Cette fonction est conservée pour compatibilité mais n'est plus utilisée
-    console.warn('sendMessage via Socket.io est déprécié, utilisez chatApi.sendMessage');
   };
 
   const joinConversation = (conversationId: number) => {
@@ -375,7 +359,6 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
         setTotalUnreadMessages(total);
       }
     } catch (error) {
-      console.error('Erreur mise à jour compteur messages:', error);
     }
   };
 

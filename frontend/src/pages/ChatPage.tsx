@@ -153,7 +153,6 @@ const ChatPage: React.FC = () => {
         }))
       );
     } catch (error) {
-      console.error('Erreur marquage messages lus:', error);
     }
   };
 
@@ -223,7 +222,6 @@ const ChatPage: React.FC = () => {
       
       // Mettre en cache ces infos pour les prochaines visites
       cacheConversationInfo(userData.id, userData.name, userData.name);
-      console.log('Infos conversation récupérées depuis la navigation:', userData);
       return;
     }
     
@@ -235,10 +233,8 @@ const ChatPage: React.FC = () => {
       if (cachedInfo) {
         setOtherUser({ id: cachedInfo.id, name: cachedInfo.name });
         setConversationTitle(cachedInfo.title || cachedInfo.name);
-        console.log('Infos conversation récupérées depuis le cache:', cachedInfo);
       }
     } catch (error) {
-      console.warn('Impossible de récupérer les infos de conversation depuis le cache:', error);
     }
   };
 
@@ -248,9 +244,7 @@ const ChatPage: React.FC = () => {
       const cachedKey = `conversation_${conversationId}`;
       const info = { id, name, title };
       storageManager.setObject(cachedKey, info);
-      console.log('Infos conversation mises en cache:', info);
     } catch (error) {
-      console.warn('Impossible de mettre en cache les infos de conversation:', error);
     }
   };
 
@@ -293,7 +287,6 @@ const ChatPage: React.FC = () => {
             cacheConversationInfo(userData.id, userData.name, userData.name);
           }
         } catch (convError) {
-          console.warn('Impossible de récupérer les conversations:', convError);
           // Si même les conversations échouent, garder les infos du cache si disponibles
           if (!otherUser) {
             setConversationTitle('Utilisateur');
@@ -301,7 +294,6 @@ const ChatPage: React.FC = () => {
         }
       }
     } catch (error) {
-      console.error('Erreur lors du chargement des messages:', error);
       errorToast('Impossible de charger les messages');
       
       // En cas d'erreur, si on n'a pas d'infos, utiliser un titre générique
@@ -345,7 +337,6 @@ const ChatPage: React.FC = () => {
         });
       }, 100);
     } catch (error) {
-      console.error('Erreur lors de l\'envoi du message:', error);
       errorToast('Impossible d\'envoyer le message');
     } finally {
       setIsSending(false);
