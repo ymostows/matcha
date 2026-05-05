@@ -171,7 +171,7 @@ async function createProfile(userId, profileData) {
     const query = `
       UPDATE profiles
       SET biography = $2, age = $3, gender = $4, sexual_orientation = $5,
-          interests = $6, city = $7, fame_rating = $8, updated_at = CURRENT_TIMESTAMP
+          interests = $6, city = $7, fame_rating = $8, isComplete = true, updated_at = CURRENT_TIMESTAMP
       WHERE user_id = $1
       RETURNING *
     `;

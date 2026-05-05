@@ -12,6 +12,13 @@ import { CompleteProfile, ProfileData, UserUpdateData } from '@/services/profile
 
 type EditableProfile = Partial<CompleteProfile & UserUpdateData & ProfileData>;
 
+const validCoords = (lat: any, lng: any) => {
+  const la = Number(lat);
+  const lo = Number(lng);
+  if (lat == null || lng == null || isNaN(la) || isNaN(lo) || (la === 0 && lo === 0)) return {};
+  return { location_lat: la, location_lng: lo };
+};
+
 export const ProfileEditPage: React.FC = () => {
   const { refreshUser } = useAuth();
   const [profile, setProfile] = useState<EditableProfile | null>(null);
@@ -50,9 +57,9 @@ export const ProfileEditPage: React.FC = () => {
 
   const initialLocation = useMemo(() => ({
     city: profile?.city,
-    latitude: profile?.latitude,
-    longitude: profile?.longitude,
-  }), [profile?.city, profile?.latitude, profile?.longitude]);
+    latitude: (profile as any)?.latitude ?? profile?.location_lat,
+    longitude: (profile as any)?.longitude ?? profile?.location_lng,
+  }), [profile?.city, (profile as any)?.latitude, profile?.location_lat, (profile as any)?.longitude, profile?.location_lng]);
 
   const handleSave = async () => {
     if (!profile) return;
@@ -71,14 +78,13 @@ export const ProfileEditPage: React.FC = () => {
       };
 
       const profileData = {
-        age: profile.age,
+        age: profile.age !== undefined ? Number(profile.age) : undefined,
         gender: profile.gender,
         sexual_orientation: profile.sexual_orientation,
         biography: profile.biography,
         interests: profile.interests,
         city: profile.city,
-        latitude: profile.latitude,
-        longitude: profile.longitude,
+        ...validCoords((profile as any).latitude ?? profile.location_lat, (profile as any).longitude ?? profile.location_lng),
       };
 
       await Promise.all([
@@ -90,7 +96,7 @@ export const ProfileEditPage: React.FC = () => {
       setSuccessMessage('Votre profil a été mis à jour avec succès !');
       
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Une erreur est survenue lors de la sauvegarde.');
+      setError(err.message || 'Une erreur est survenue lors de la sauvegarde.');
     } finally {
       setIsSaving(false);
     }

@@ -33,6 +33,21 @@ export async function createNotification(
   data?: any
 ): Promise<void> {
   try {
+    // Si un acteur est identifié (data.userId), vérifier qu'il n'est pas bloqué
+    const actorId = data?.userId;
+    if (actorId && actorId !== userId) {
+      const blockCheck = await pool.query(
+        `SELECT 1 FROM blocks
+         WHERE (blocker_id = $1 AND blocked_id = $2)
+            OR (blocker_id = $2 AND blocked_id = $1)`,
+        [userId, actorId]
+      );
+      if (blockCheck.rows.length > 0) {
+        console.log(`🚫 Notification supprimée (blocage) entre ${actorId} et ${userId}`);
+        return;
+      }
+    }
+
     // Utiliser le service Socket.io qui gère déjà la sauvegarde DB + temps réel
     const socketService = getSocketService();
     await socketService.sendNotification(userId, {

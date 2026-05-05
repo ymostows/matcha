@@ -17,6 +17,7 @@ import notificationsRoutes from './routes/notifications';
 import chatRoutes from './routes/chat';
 import dashboardRoutes from './routes/dashboard';
 import { sanitizeInput } from './middleware/sanitization';
+import { csrfProtection } from './middleware/csrf';
 import { initializeEmailTransporter } from './config/email';
 import errorHandler from './middleware/errorHandler';
 import { initializeSocketService } from './services/socketService';
@@ -54,6 +55,7 @@ app.use(cors({
   credentials: true
 })); // CORS sécurisé avec origins configurables
 app.use(express.json({ limit: '50mb' })); // Parser JSON avec limite pour base64
+app.use(csrfProtection); // Protection CSRF via validation Origin
 app.use(sanitizeInput); // Protection XSS
 
 // Servir les fichiers statiques d'upload

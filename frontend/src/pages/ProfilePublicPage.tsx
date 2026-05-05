@@ -208,7 +208,7 @@ export const ProfilePublicPage: React.FC = () => {
       }
     } catch (err: any) {
       console.error('Erreur lors du like:', err);
-      const errorMessage = err.response?.data?.message || 'Erreur lors de l\'action';
+      const errorMessage = err.message || 'Erreur lors de l\'action';
       
       if (errorMessage.includes('photo')) {
         showConfirm({
@@ -252,7 +252,7 @@ export const ProfilePublicPage: React.FC = () => {
           navigate('/browsing'); // Rediriger vers la page de navigation
         } catch (err: any) {
           console.error('Erreur lors du blocage:', err);
-          const errorMessage = err.response?.data?.message || 'Erreur lors du blocage';
+          const errorMessage = err.message || 'Erreur lors du blocage';
           errorToast(errorMessage);
         } finally {
           setDialogLoading(false);
@@ -280,7 +280,7 @@ export const ProfilePublicPage: React.FC = () => {
           closePrompt();
         } catch (err: any) {
           console.error('Erreur lors du signalement:', err);
-          const errorMessage = err.response?.data?.message || 'Erreur lors du signalement';
+          const errorMessage = err.message || 'Erreur lors du signalement';
           errorToast(errorMessage);
         } finally {
           setPromptLoading(false);

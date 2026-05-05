@@ -1,13 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { User, Plus, X } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
-import { UserUpdateData, ProfileData } from '../../services/profileApi';
+import { UserUpdateData, ProfileData, profileApi } from '../../services/profileApi';
 import { FormField } from '../ui/form';
 
-const POPULAR_INTERESTS = [
+const FALLBACK_INTERESTS = [
   '🎵 Musique', '🎬 Cinéma', '📚 Lecture', '🏃‍♂️ Sport', '🎯 Gaming',
   '🍳 Cuisine', '✈️ Voyage', '🎨 Art', '📸 Photo', '🌿 Nature',
   '💃 Danse', '🎭 Théâtre', '🏔️ Randonnée', '🏊‍♀️ Natation', '🧘‍♀️ Yoga',
@@ -17,15 +17,18 @@ const POPULAR_INTERESTS = [
 interface UserInfoFormProps {
   profileData: Partial<EditableProfileData>;
   onDataChange: (updatedData: Partial<EditableProfileData>) => void;
+  externalErrors?: Record<string, string>;
 }
 
 type EditableProfileData = UserUpdateData & ProfileData;
 
-export const UserInfoForm: React.FC<UserInfoFormProps> = ({ 
-  profileData, 
-  onDataChange
+export const UserInfoForm: React.FC<UserInfoFormProps> = ({
+  profileData,
+  onDataChange,
+  externalErrors = {}
 }) => {
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const allErrors = { ...externalErrors, ...errors };
   const [customInterest, setCustomInterest] = useState('');
 
   const handleChange = (field: keyof EditableProfileData, value: string | number | string[] | undefined) => {
@@ -71,13 +74,13 @@ export const UserInfoForm: React.FC<UserInfoFormProps> = ({
       </div>
 
       <div className="space-y-6">
-        {errors.general && (
+        {allErrors.general && (
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             className="p-4 bg-red-50 border border-red-200 rounded-xl"
           >
-            <p className="text-red-800">{errors.general}</p>
+            <p className="text-red-800">{allErrors.general}</p>
           </motion.div>
         )}
         
@@ -87,7 +90,7 @@ export const UserInfoForm: React.FC<UserInfoFormProps> = ({
             name="first_name"
             value={profileData.first_name || ''}
             onChange={(value) => handleChange('first_name', value)}
-            error={errors.first_name}
+            error={allErrors.first_name}
           />
 
           <FormField
@@ -95,7 +98,7 @@ export const UserInfoForm: React.FC<UserInfoFormProps> = ({
             name="last_name"
             value={profileData.last_name || ''}
             onChange={(value) => handleChange('last_name', value)}
-            error={errors.last_name}
+            error={allErrors.last_name}
           />
         </div>
 
@@ -105,7 +108,7 @@ export const UserInfoForm: React.FC<UserInfoFormProps> = ({
           type="email"
           value={profileData.email || ''}
           onChange={(value) => handleChange('email', value)}
-          error={errors.email}
+          error={allErrors.email}
         />
         
         <hr className="border-gray-200"/>
@@ -120,9 +123,9 @@ export const UserInfoForm: React.FC<UserInfoFormProps> = ({
               placeholder="25"
               min="18"
               max="100"
-              className={errors.age ? 'border-red-400' : ''}
+              className={allErrors.age ? 'border-red-400' : ''}
             />
-            {errors.age && <p className="text-red-500 text-sm mt-1">{errors.age}</p>}
+            {allErrors.age && <p className="text-red-500 text-sm mt-1">{allErrors.age}</p>}
           </div>
 
           <div className="space-y-3">
@@ -141,7 +144,7 @@ export const UserInfoForm: React.FC<UserInfoFormProps> = ({
                 </button>
               ))}
             </div>
-            {errors.gender && <p className="text-red-500 text-sm mt-1">{errors.gender}</p>}
+            {allErrors.gender && <p className="text-red-500 text-sm mt-1">{allErrors.gender}</p>}
           </div>
         </div>
 
@@ -166,7 +169,7 @@ export const UserInfoForm: React.FC<UserInfoFormProps> = ({
               </button>
             ))}
           </div>
-          {errors.sexual_orientation && <p className="text-red-500 text-sm mt-1">{errors.sexual_orientation}</p>}
+          {allErrors.sexual_orientation && <p className="text-red-500 text-sm mt-1">{allErrors.sexual_orientation}</p>}
         </div>
         
         <hr className="border-gray-200"/>
@@ -180,10 +183,10 @@ export const UserInfoForm: React.FC<UserInfoFormProps> = ({
             placeholder="Parlez un peu de vous..."
             rows={4}
             maxLength={500}
-            className={`resize-none ${errors.biography ? 'border-red-400' : ''}`}
+            className={`resize-none ${allErrors.biography ? 'border-red-400' : ''}`}
           />
           <p className="text-xs text-gray-500 text-right">{profileData.biography?.length || 0}/500</p>
-          {errors.biography && <p className="text-red-500 text-sm mt-1">{errors.biography}</p>}
+          {allErrors.biography && <p className="text-red-500 text-sm mt-1">{allErrors.biography}</p>}
         </div>
 
         <div className="space-y-4">
@@ -206,7 +209,7 @@ export const UserInfoForm: React.FC<UserInfoFormProps> = ({
           </div>
           
           <p className="text-xs text-gray-500">Sélectionnez jusqu'à 10 centres d'intérêt.</p>
-          {errors.interests && <p className="text-red-500 text-sm mt-1">{errors.interests}</p>}
+          {allErrors.interests && <p className="text-red-500 text-sm mt-1">{allErrors.interests}</p>}
 
           <div className="space-y-3">
             <h4 className="text-sm font-semibold text-twilight/80">Suggestions</h4>

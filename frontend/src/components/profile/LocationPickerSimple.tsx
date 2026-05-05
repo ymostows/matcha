@@ -146,38 +146,15 @@ export const LocationPickerSimple: React.FC<LocationPickerSimpleProps> = ({
         setLocation(cityLocation);
         setStatus(`Localisation trouvée : ${cityLocation.publicCity || cityLocation.city}`);
       } else {
-        // Fallback : créer une entrée manuelle sans coordonnées
-        const manualLocation: LocationData = {
-          latitude: 0,
-          longitude: 0,
-          city: cleanCity,
-          publicCity: cleanCity,
-          method: 'manual',
-          precision: 'low',
-          accuracy: 'Saisie manuelle (pas de coordonnées GPS)',
-          timestamp: Date.now()
-        };
-        
-        setLocation(manualLocation);
-        setStatus(`Localisation définie : ${cleanCity}`);
+        // Pas de coordonnées disponibles : on garde location=null et manualCity
+        // Le useEffect enverra { latitude: null, longitude: null, city } sans (0,0)
+        setLocation(null);
+        setStatus(`Ville définie : ${cleanCity} (sans coordonnées GPS)`);
       }
     } catch (error) {
       console.warn('Erreur géolocalisation automatique:', error);
-      
-      // En cas d'erreur, créer une entrée manuelle
-      const manualLocation: LocationData = {
-        latitude: 0,
-        longitude: 0,
-        city: cleanCity,
-        publicCity: cleanCity,
-        method: 'manual',
-        precision: 'low',
-        accuracy: 'Saisie manuelle (géocodage échoué)',
-        timestamp: Date.now()
-      };
-      
-      setLocation(manualLocation);
-      setStatus(`Localisation définie : ${cleanCity}`);
+      setLocation(null);
+      setStatus(`Ville définie : ${cleanCity} (sans coordonnées GPS)`);
     }
   };
 

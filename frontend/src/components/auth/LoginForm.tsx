@@ -35,8 +35,8 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister }) => {
 
   // Validation côté client
   const validateForm = (): boolean => {
-    if (!formData.email.trim() || !formData.email.includes('@')) {
-      setError('Veuillez entrer un email valide');
+    if (!formData.email.trim()) {
+      setError('Veuillez entrer votre email ou nom d\'utilisateur');
       return false;
     }
     if (!formData.password.trim()) {
@@ -59,7 +59,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister }) => {
       notify.success('Connexion réussie ! Vous allez être redirigé.');
       navigate('/dashboard');
     } catch (err: any) {
-      const errorMessage = err.response?.data?.message || 'Une erreur est survenue lors de la connexion.';
+      const errorMessage = err.message || 'Une erreur est survenue lors de la connexion.';
       notify.error(errorMessage);
       setError(errorMessage); // Met aussi à jour l'erreur locale si besoin
     } finally {

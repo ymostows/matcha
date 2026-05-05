@@ -357,4 +357,10 @@ export const profileApi = {
     const response = await api.get<ApiResponse<ReportedUser[]>>(`/profile/reported?limit=${limit}`);
     return response.reported || [];
   },
-}; 
+
+  // Obtenir les tags populaires depuis la base (basé sur les profils seedés)
+  async getPopularTags(limit: number = 30): Promise<string[]> {
+    const response = await api.get<{ success: boolean; tags: { tag: string; usage_count: number }[] }>(`/profile/tags/suggestions?limit=${limit}`);
+    return (response.tags || []).map((t: { tag: string }) => t.tag);
+  },
+};

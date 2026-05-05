@@ -364,7 +364,7 @@ const BrowsingPage: React.FC = () => {
     } catch (err: any) {
       console.error('Erreur lors du like:', err);
       // Afficher l'erreur à l'utilisateur
-      const errorMessage = err.response?.data?.message || 'Erreur lors du like';
+      const errorMessage = err.message || 'Erreur lors du like';
       
       // Si l'erreur indique qu'il faut des photos, rediriger vers la page d'édition
       if (errorMessage.includes('photo')) {
@@ -407,7 +407,7 @@ const BrowsingPage: React.FC = () => {
       setProfiles(prev => prev.filter(p => p.user_id !== userId));
     } catch (err: any) {
       console.error('Erreur lors de l\'unlike:', err);
-      const errorMessage = err.response?.data?.message || 'Erreur lors de l\'annulation du like';
+      const errorMessage = err.message || 'Erreur lors de l\'annulation du like';
       errorToast(errorMessage);
       // Ne pas retirer le profil de la liste en cas d'erreur
     } finally {

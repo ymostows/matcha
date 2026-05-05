@@ -310,15 +310,17 @@ router.put('/location/update-public-city', authenticateToken, async (req: Reques
 router.get('/browse', authenticateToken, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = (req as any).user.userId;
-    const { 
-      sortBy = 'distance', 
+    const {
+      sortBy = 'distance',
       sortOrder = 'asc',
-      ageMin, 
+      ageMin,
       ageMax,
       maxDistance = 500,
       minFameRating = 0,
-      maxFameRating = 100
+      maxFameRating = 100,
+      limit: limitParam
     } = req.query;
+    const limit = Math.min(parseInt(limitParam as string) || 500, 500);
 
     // Extraire les tableaux avec gestion correcte des paramètres multiples
     const commonTags = Array.isArray(req.query.commonTags) 
@@ -534,7 +536,7 @@ router.get('/browse', authenticateToken, async (req: Request, res: Response): Pr
         break;
     }
 
-    query += ` ${orderClause} LIMIT 50`;
+    query += ` ${orderClause} LIMIT ${limit}`;
 
     // Logs de debug pour le développement
     if (process.env.NODE_ENV === 'development') {
@@ -751,132 +753,6 @@ router.delete('/matches/:matchId', authenticateToken, async (req: AuthenticatedR
     res.status(500).json({
       success: false,
       message: 'Erreur serveur'
-    });
-  }
-});
-
-// GET /api/profile/:userId - Obtenir un profil public par ID et enregistrer la visite
-router.get('/:userId', authenticateToken, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const visitorId = (req as any).user.userId;
-    const userIdParam = req.params.userId;
-    
-    if (!userIdParam) {
-      res.status(400).json({ 
-        success: false, 
-        message: 'ID utilisateur manquant' 
-      });
-      return;
-    }
-    
-    const targetUserId = parseInt(userIdParam);
-
-    if (isNaN(targetUserId)) {
-      res.status(400).json({ 
-        success: false, 
-        message: 'ID utilisateur invalide' 
-      });
-      return;
-    }
-
-    // Ne pas permettre de voir son propre profil via cette route
-    if (visitorId === targetUserId) {
-      res.status(400).json({ 
-        success: false, 
-        message: 'Utilisez la route /profile pour votre propre profil' 
-      });
-      return;
-    }
-
-    // Vérifier si l'utilisateur est bloqué
-    const blockCheck = await pool.query(`
-      SELECT 1 FROM blocks 
-      WHERE (blocker_id = $1 AND blocked_id = $2) OR (blocker_id = $2 AND blocked_id = $1)
-    `, [visitorId, targetUserId]);
-
-    if (blockCheck.rows.length > 0) {
-      res.status(403).json({ 
-        success: false, 
-        message: 'Profil non accessible' 
-      });
-      return;
-    }
-
-    // Récupérer les coordonnées de l'utilisateur visiteur pour calculer la distance
-    const visitorProfile = await ProfileModel.findByUserId(visitorId);
-    let visitorCoordinates = undefined;
-    if (visitorProfile && visitorProfile.location_lat && visitorProfile.location_lng) {
-      visitorCoordinates = {
-        latitude: typeof visitorProfile.location_lat === 'string' ? parseFloat(visitorProfile.location_lat) : visitorProfile.location_lat,
-        longitude: typeof visitorProfile.location_lng === 'string' ? parseFloat(visitorProfile.location_lng) : visitorProfile.location_lng
-      };
-    }
-
-    // Obtenir le profil complet avec calcul de distance
-    const profile = await ProfileModel.findCompleteProfile(targetUserId, visitorCoordinates);
-    
-    if (!profile) {
-      res.status(404).json({ 
-        success: false, 
-        message: 'Profil non trouvé' 
-      });
-      return;
-    }
-
-    // Enregistrer la visite (ne pas enregistrer si c'est une visite répétée dans la même session/jour)
-    const client = await pool.connect();
-    let isNewVisit = false;
-    try {
-      // Vérifier si une visite existe déjà aujourd'hui
-      const existingVisit = await client.query(`
-        SELECT id FROM profile_visits 
-        WHERE visitor_id = $1 AND visited_id = $2 AND DATE(visited_at) = CURRENT_DATE
-      `, [visitorId, targetUserId]);
-
-      if (existingVisit.rows.length === 0) {
-        // Nouvelle visite aujourd'hui
-        await client.query(`
-          INSERT INTO profile_visits (visitor_id, visited_id, visited_at)
-          VALUES ($1, $2, CURRENT_TIMESTAMP)
-        `, [visitorId, targetUserId]);
-        isNewVisit = true;
-      } else {
-        // Mettre à jour l'heure de la visite existante
-        await client.query(`
-          UPDATE profile_visits 
-          SET visited_at = CURRENT_TIMESTAMP
-          WHERE visitor_id = $1 AND visited_id = $2 AND DATE(visited_at) = CURRENT_DATE
-        `, [visitorId, targetUserId]);
-        isNewVisit = false;
-      }
-
-      // Mettre à jour le fame rating du profil visité
-      await updateFameRating(targetUserId, client);
-    } finally {
-      client.release();
-    }
-
-    // Créer une notification pour la visite (seulement si c'est une nouvelle visite)
-    if (isNewVisit && visitorProfile) {
-      // Récupérer les informations complètes du visiteur pour la notification
-      const visitorFullProfile = await ProfileModel.findCompleteProfile(visitorId);
-      await createNotification(
-        targetUserId,
-        NotificationType.VISIT,
-        `👁️ ${visitorFullProfile?.first_name} a visité votre profil`,
-        { userId: visitorId, profileName: visitorFullProfile?.first_name }
-      );
-    }
-    
-    res.json({ 
-      success: true, 
-      profile 
-    });
-  } catch (error) {
-    console.error('Erreur récupération profil:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Erreur serveur' 
     });
   }
 });
@@ -1851,4 +1727,98 @@ router.post('/geocode-city', authenticateToken, async (req: Request, res: Respon
   }
 });
 
-export default router; 
+// GET /api/profile/:userId - Obtenir un profil public par ID et enregistrer la visite
+// DOIT être après toutes les routes nommées pour ne pas capturer /liked, /blocked, etc.
+router.get('/:userId', authenticateToken, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const visitorId = (req as any).user.userId;
+    const userIdParam = req.params.userId;
+
+    if (!userIdParam) {
+      res.status(400).json({ success: false, message: 'ID utilisateur manquant' });
+      return;
+    }
+
+    const targetUserId = parseInt(userIdParam);
+
+    if (isNaN(targetUserId)) {
+      res.status(400).json({ success: false, message: 'ID utilisateur invalide' });
+      return;
+    }
+
+    if (visitorId === targetUserId) {
+      res.status(400).json({ success: false, message: 'Utilisez la route /profile pour votre propre profil' });
+      return;
+    }
+
+    const blockCheck = await pool.query(`
+      SELECT 1 FROM blocks
+      WHERE (blocker_id = $1 AND blocked_id = $2) OR (blocker_id = $2 AND blocked_id = $1)
+    `, [visitorId, targetUserId]);
+
+    if (blockCheck.rows.length > 0) {
+      res.status(403).json({ success: false, message: 'Profil non accessible' });
+      return;
+    }
+
+    const visitorProfile = await ProfileModel.findByUserId(visitorId);
+    let visitorCoordinates = undefined;
+    if (visitorProfile && visitorProfile.location_lat && visitorProfile.location_lng) {
+      visitorCoordinates = {
+        latitude: typeof visitorProfile.location_lat === 'string' ? parseFloat(visitorProfile.location_lat) : visitorProfile.location_lat,
+        longitude: typeof visitorProfile.location_lng === 'string' ? parseFloat(visitorProfile.location_lng) : visitorProfile.location_lng
+      };
+    }
+
+    const profile = await ProfileModel.findCompleteProfile(targetUserId, visitorCoordinates);
+
+    if (!profile) {
+      res.status(404).json({ success: false, message: 'Profil non trouvé' });
+      return;
+    }
+
+    const client = await pool.connect();
+    let isNewVisit = false;
+    try {
+      const existingVisit = await client.query(`
+        SELECT id FROM profile_visits
+        WHERE visitor_id = $1 AND visited_id = $2 AND DATE(visited_at) = CURRENT_DATE
+      `, [visitorId, targetUserId]);
+
+      if (existingVisit.rows.length === 0) {
+        await client.query(`
+          INSERT INTO profile_visits (visitor_id, visited_id, visited_at)
+          VALUES ($1, $2, CURRENT_TIMESTAMP)
+        `, [visitorId, targetUserId]);
+        isNewVisit = true;
+      } else {
+        await client.query(`
+          UPDATE profile_visits
+          SET visited_at = CURRENT_TIMESTAMP
+          WHERE visitor_id = $1 AND visited_id = $2 AND DATE(visited_at) = CURRENT_DATE
+        `, [visitorId, targetUserId]);
+      }
+
+      await updateFameRating(targetUserId, client);
+    } finally {
+      client.release();
+    }
+
+    if (isNewVisit && visitorProfile) {
+      const visitorFullProfile = await ProfileModel.findCompleteProfile(visitorId);
+      await createNotification(
+        targetUserId,
+        NotificationType.VISIT,
+        `👁️ ${visitorFullProfile?.first_name} a visité votre profil`,
+        { userId: visitorId, profileName: visitorFullProfile?.first_name }
+      );
+    }
+
+    res.json({ success: true, profile });
+  } catch (error) {
+    console.error('Erreur récupération profil:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+export default router;

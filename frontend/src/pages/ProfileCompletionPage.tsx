@@ -12,6 +12,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { checkProfileCompletion } from '@/hooks/useProfileCompletion';
 
 
+const validCoords = (lat: any, lng: any) => {
+  const la = Number(lat);
+  const lo = Number(lng);
+  if (lat == null || lng == null || isNaN(la) || isNaN(lo) || (la === 0 && lo === 0)) return {};
+  return { location_lat: la, location_lng: lo };
+};
+
 export const ProfileCompletionPage: React.FC = () => {
   const { user, refreshUser } = useAuth();
   const navigate = useNavigate();
@@ -20,13 +27,22 @@ export const ProfileCompletionPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [completionError, setCompletionError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const handleProfileDataChange = useCallback((data: any) => {
     setProfile((prev: any) => ({ ...prev, ...data }));
+    // Efface les erreurs des champs qui viennent d'être modifiés
+    const edited = Object.keys(data);
+    setFieldErrors(prev => {
+      const next = { ...prev };
+      edited.forEach(f => delete next[f]);
+      return next;
+    });
   }, []);
 
   const handlePhotosChange = useCallback((photos: any[]) => {
     setProfile((prev: any) => ({ ...prev, photos }));
+    if (photos.length > 0) setCompletionError(null);
   }, []);
 
   const handleLocationChange = useCallback((loc: any) => {
@@ -80,55 +96,103 @@ export const ProfileCompletionPage: React.FC = () => {
         biography: profile.biography,
         interests: profile.interests,
         city: profile.city,
-        latitude: profile.latitude,
-        longitude: profile.longitude,
-        age: profile.age
+        ...validCoords(profile.latitude ?? profile.location_lat, profile.longitude ?? profile.location_lng),
+        age: profile.age !== undefined ? Number(profile.age) : undefined,
       };
 
       await Promise.all([
         profileApi.updateUserInfo(userInfoToSave),
         profileApi.updateProfile(profileDataToSave)
       ]);
-      
+
       // On rafraîchit le contexte global ici, une fois que tout est sauvegardé.
       await refreshUser();
-      
+
       return true;
     } catch (error) {
-      setCompletionError("Une erreur est survenue lors de la sauvegarde. Veuillez réessayer.");
+      setCompletionError((error as Error).message || "Une erreur est survenue lors de la sauvegarde.");
       return false;
     } finally {
       setIsSaving(false);
     }
   };
   
+  const validateStep = (step: number): Record<string, string> => {
+    const p = profile || {};
+    const errs: Record<string, string> = {};
+    if (step === 0) {
+      if (!p.first_name?.trim()) errs.first_name = 'Le prénom est requis';
+      else if (p.first_name.trim().length < 2) errs.first_name = 'Le prénom doit contenir au moins 2 caractères';
+
+      if (!p.last_name?.trim()) errs.last_name = 'Le nom est requis';
+      else if (p.last_name.trim().length < 2) errs.last_name = 'Le nom doit contenir au moins 2 caractères';
+
+      const age = Number(p.age);
+      if (!p.age) errs.age = 'L\'âge est requis';
+      else if (isNaN(age) || age < 18) errs.age = 'Vous devez avoir au moins 18 ans';
+      else if (age > 120) errs.age = 'Âge invalide';
+
+      if (!p.gender) errs.gender = 'Veuillez sélectionner votre genre';
+      if (!p.sexual_orientation) errs.sexual_orientation = 'Veuillez sélectionner votre orientation';
+
+      if (!p.biography?.trim()) errs.biography = 'La biographie est requise';
+      else if (p.biography.trim().length < 10) errs.biography = 'La biographie doit contenir au moins 10 caractères';
+      else if (p.biography.trim().length > 500) errs.biography = 'La biographie ne peut pas dépasser 500 caractères';
+
+      if (!Array.isArray(p.interests) || p.interests.length === 0) errs.interests = 'Ajoutez au moins un centre d\'intérêt';
+    }
+    return errs;
+  };
+
   const goToNext = async () => {
-    // La sauvegarde des étapes individuelles est retirée.
-    // La validation et la sauvegarde se font uniquement à la fin.
+    setCompletionError(null);
+    setFieldErrors({});
+
     if (currentStep < steps.length - 1) {
+      if (currentStep === 0) {
+        const errs = validateStep(0);
+        if (Object.keys(errs).length > 0) { setFieldErrors(errs); return; }
+      }
+      if (currentStep === 1) {
+        const p = profile || {};
+        if (!Array.isArray(p.photos) || p.photos.length === 0) {
+          setCompletionError('Veuillez ajouter au moins une photo');
+          return;
+        }
+      }
       setCurrentStep(currentStep + 1);
     } else {
-      // Étape finale : valider, sauvegarder, et rediriger
+      // Étape finale : valider tous les champs, sauvegarder, et rediriger
       const { isComplete, missingFields } = checkProfileCompletion(profile);
-      if (isComplete) {
-        const saved = await saveFullProfile();
-        if (saved) {
-          try {
-            // Marquer le profil comme complet
-            await profileApi.completeProfile();
-            navigate('/dashboard');
-          } catch (error) {
-            setCompletionError("Erreur lors de la finalisation du profil. Veuillez réessayer.");
-          }
+      if (!isComplete) {
+        // Revenir à l'étape qui contient les champs manquants
+        const step0Labels = ['Biographie', 'Genre', 'Orientation sexuelle', 'Centres d\'intérêt'];
+        const step1Labels = ['Photos'];
+        if (missingFields.some(f => step0Labels.includes(f))) {
+          setFieldErrors(validateStep(0));
+          setCurrentStep(0);
+        } else if (missingFields.some(f => step1Labels.includes(f))) {
+          setCompletionError('Veuillez ajouter au moins une photo');
+          setCurrentStep(1);
         }
-      } else {
-        setCompletionError(`Veuillez compléter les champs suivants pour terminer : ${missingFields.join(', ')}`);
+        return;
+      }
+      const saved = await saveFullProfile();
+      if (saved) {
+        try {
+          await profileApi.completeProfile();
+          navigate('/dashboard');
+        } catch (error) {
+          setCompletionError((error as Error).message || "Erreur lors de la finalisation du profil.");
+        }
       }
     }
   };
 
   const goToPrevious = () => {
     if (currentStep > 0) {
+      setCompletionError(null);
+      setFieldErrors({});
       setCurrentStep(currentStep - 1);
     }
   };
@@ -150,6 +214,7 @@ export const ProfileCompletionPage: React.FC = () => {
             <UserInfoForm
               profileData={profile}
               onDataChange={handleProfileDataChange}
+              externalErrors={fieldErrors}
             />
           </motion.div>
         );

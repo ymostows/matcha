@@ -1,3 +1,6 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 import { Pool } from 'pg';
 
 // Configuration de la connexion PostgreSQL optimisée pour Neon
