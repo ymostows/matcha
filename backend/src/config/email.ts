@@ -92,7 +92,7 @@ const sendVerificationEmail = async (email: string, token: string): Promise<stri
         </p>
       </div>
       <div style="text-align: center; margin-top: 20px; color: #999; font-size: 12px;">
-        © 2024 Matcha - L'amour au premier clic 💕
+        © 2025 Matcha - L'amour au premier clic 💕
       </div>
     </div>
   `;
@@ -131,7 +131,7 @@ const sendPasswordResetEmail = async (email: string, token: string): Promise<str
         </p>
       </div>
       <div style="text-align: center; margin-top: 20px; color: #999; font-size: 12px;">
-        © 2024 Matcha - L'amour au premier clic 💕
+        © 2025 Matcha - L'amour au premier clic 💕
       </div>
     </div>
   `;

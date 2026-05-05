@@ -24,7 +24,7 @@ const Footer: React.FC = () => {
           
           {/* Copyright */}
           <div className="flex items-center space-x-1 text-sm text-twilight/50">
-            <span>© 2024 Matcha - Projet d'école</span>
+            <span>© 2025 Matcha - Projet d'école</span>
             <Heart className="w-3 h-3 text-primary fill-current ml-1" />
           </div>
         </div>
