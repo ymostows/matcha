@@ -10,10 +10,12 @@ import { useToast } from '../../hooks/useToast';
 
 interface MatchesSectionProps {
   limit?: number;
+  refreshTrigger?: number;
 }
 
 export const MatchesSection: React.FC<MatchesSectionProps> = ({ 
-  limit = 6
+  limit = 6,
+  refreshTrigger
 }) => {
   const { success: successToast, error: errorToast } = useToast();
   const [matches, setMatches] = useState<MatchItem[]>([]);
@@ -22,6 +24,12 @@ export const MatchesSection: React.FC<MatchesSectionProps> = ({
   useEffect(() => {
     loadMatches();
   }, [limit]);
+
+  useEffect(() => {
+    if (refreshTrigger !== undefined && refreshTrigger > 0) {
+      loadMatches();
+    }
+  }, [refreshTrigger]);
 
   const loadMatches = async () => {
     try {

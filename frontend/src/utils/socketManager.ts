@@ -84,11 +84,10 @@ class SocketManager {
       this.socket = io(this.options.url, {
         auth: this.options.auth,
         autoConnect: true,
-        reconnection: false, // On gère la reconnexion nous-mêmes
+        reconnection: false,
         timeout: 10000,
         forceNew: true,
-        // Optimisations pour la navigation privée
-        transports: ['websocket', 'polling'],
+        transports: ['polling', 'websocket'],
         upgrade: true,
         rememberUpgrade: false
       });

@@ -17,6 +17,7 @@ export const UserDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { completionPercentage, isLoading: profileLoading } = useProfileCompletion();
   const { notifications } = useSocket();
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // États pour les vraies données
   const [stats, setStats] = useState({
@@ -69,21 +70,20 @@ export const UserDashboard: React.FC = () => {
 
   // Mettre à jour les stats quand de nouvelles notifications arrivent
   useEffect(() => {
-    if (notifications.length > 0) {
-      // Détecter les nouveaux événements qui affectent les compteurs
-      const recentNotifications = notifications.filter(n => 
-        new Date(n.created_at).getTime() > Date.now() - 10000 // Dernières 10 secondes
-      );
-      
-      const hasRelevantUpdates = recentNotifications.some(n => 
-        ['like', 'match', 'visit', 'message', 'unlike'].includes(n.type)
-      );
-      
-      if (hasRelevantUpdates) {
-        // Mise à jour des compteurs suite aux notifications
-        refreshStats();
+      if (notifications.length > 0) {
+        const recentNotifications = notifications.filter(n => 
+          new Date(n.created_at).getTime() > Date.now() - 10000
+        );
+        
+        const hasRelevantUpdates = recentNotifications.some(n => 
+          ['like', 'match', 'visit', 'message', 'unlike'].includes(n.type)
+        );
+        
+        if (hasRelevantUpdates) {
+          refreshStats();
+          setRefreshTrigger(prev => prev + 1); // ← AJOUTER
+        }
       }
-    }
   }, [notifications]);
 
   return (
@@ -272,7 +272,7 @@ export const UserDashboard: React.FC = () => {
           className="min-h-0 flex flex-col"
         >
           <div className="flex-1 max-h-[500px] xl:max-h-[600px] overflow-hidden">
-            <MatchesSection limit={6} />
+            <MatchesSection limit={6} refreshTrigger={refreshTrigger} />
           </div>
         </motion.div>
 
@@ -288,6 +288,7 @@ export const UserDashboard: React.FC = () => {
               limit={6}
               showHeader={false}
               compact={true}
+              refreshTrigger={refreshTrigger} // ← AJOUTER
             />
           </div>
         </motion.div>

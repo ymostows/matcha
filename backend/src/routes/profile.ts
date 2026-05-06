@@ -812,44 +812,44 @@ router.post('/like', authenticateToken, async (req: Request, res: Response): Pro
         }
       }
 
-      res.json({
-        success: true,
-        message: isLike ? 'Profil liké' : 'Profil disliké',
-        isMatch
-      });
-
     } finally {
       client.release();
     }
 
+    res.json({
+      success: true,
+      message: isLike ? 'Profil liké' : 'Profil disliké',
+      isMatch
+    });
+
     // Créer les notifications après avoir relâché la connexion
     if (isLike) {
-      // Obtenir les infos de l'utilisateur qui a liké
-      const likerProfile = await ProfileModel.findCompleteProfile(userId);
-      
-      if (isMatch) {
-        // Notification de match pour les deux utilisateurs
-        await createNotification(
-          targetUserId,
-          NotificationType.MATCH,
-          `🎉 Vous avez un nouveau match avec ${likerProfile?.first_name}!`,
-          { userId: userId, profileName: likerProfile?.first_name }
-        );
-        
-        await createNotification(
-          userId,
-          NotificationType.MATCH,
-          `🎉 Vous avez un nouveau match avec ${targetUser.first_name}!`,
-          { userId: targetUserId, profileName: targetUser.first_name }
-        );
-      } else {
-        // Notification de like simple
-        await createNotification(
-          targetUserId,
-          NotificationType.LIKE,
-          `❤️ ${likerProfile?.first_name} a liké votre profil!`,
-          { userId: userId, profileName: likerProfile?.first_name }
-        );
+      try {
+        const likerProfile = await ProfileModel.findCompleteProfile(userId);
+        if (isMatch) {
+          await createNotification(
+            targetUserId,
+            NotificationType.MATCH,
+            `🎉 Vous avez un nouveau match avec ${likerProfile?.first_name}!`,
+            { userId: userId, profileName: likerProfile?.first_name }
+          );
+          await createNotification(
+            userId,
+            NotificationType.MATCH,
+            `🎉 Vous avez un nouveau match avec ${targetUser.first_name}!`,
+            { userId: targetUserId, profileName: targetUser.first_name }
+          );
+        } else {
+          await createNotification(
+            targetUserId,
+            NotificationType.LIKE,
+            `❤️ ${likerProfile?.first_name} a liké votre profil!`,
+            { userId: userId, profileName: likerProfile?.first_name }
+          );
+        }
+      } catch (notifError) {
+        // Ne pas faire échouer la requête si les notifications échouent
+        console.error('Erreur notification:', notifError);
       }
     }
 

@@ -22,13 +22,15 @@ interface LikesHistoryProps {
   showHeader?: boolean;
   compact?: boolean;
   onLikeCountChange?: (count: number) => void;
+  refreshTrigger?: number;
 }
 
 export const LikesHistory: React.FC<LikesHistoryProps> = ({ 
   limit = 20, 
   showHeader = true, 
   compact = false,
-  onLikeCountChange 
+  onLikeCountChange ,
+  refreshTrigger
 }) => {
   const { success: successToast, error: errorToast } = useToast();
   const navigate = useNavigate();
@@ -61,6 +63,12 @@ export const LikesHistory: React.FC<LikesHistoryProps> = ({
       onLikeCountChange(likes.length);
     }
   }, [likes, onLikeCountChange]);
+
+  useEffect(() => {
+    if (refreshTrigger && refreshTrigger > 0) {
+      loadLikesHistory();
+    }
+  }, [refreshTrigger]);
 
   const handleLikeBack = async (userId: number) => {
     if (likeActions[userId]) return; // Prevent double clicking
