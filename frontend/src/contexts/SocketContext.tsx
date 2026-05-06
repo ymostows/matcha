@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useState, ReactNode, useRef, useCallback } from 'react';
 import { useAuth } from './AuthContext';
 import { Socket } from 'socket.io-client';
 import SocketManager from '../utils/socketManager';
@@ -294,17 +294,13 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   };
 
   // Callbacks pour les événements de messages avec nettoyage automatique
-  const onNewMessage = (callback: (message: any) => void) => {
+  const onNewMessage = useCallback((callback: (message: any) => void) => {
     messageCallbacks.current.push(callback);
-    
-    // Retourner une fonction de nettoyage
     return () => {
       const index = messageCallbacks.current.indexOf(callback);
-      if (index > -1) {
-        messageCallbacks.current.splice(index, 1);
-      }
+      if (index > -1) messageCallbacks.current.splice(index, 1);
     };
-  };
+}, []);
 
   const onMessageRead = (callback: (data: any) => void) => {
     messageReadCallbacks.current.push(callback);
@@ -344,23 +340,18 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   };
 
   // Fonction pour mettre à jour le compte des messages non lus
-  const updateUnreadMessageCount = async () => {
+  const updateUnreadMessageCount = useCallback(async () => {
     try {
       const conversations = await fetch('http://localhost:3001/api/chat/conversations', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+        headers: { 'Authorization': `Bearer ${token}` }
       });
-      
       if (conversations.ok) {
         const data = await conversations.json();
         const total = data.conversations?.reduce((acc: number, conv: any) => acc + (conv.unread_count || 0), 0) || 0;
         setTotalUnreadMessages(total);
       }
-    } catch (error) {
-    }
-  };
+    } catch (error) {}
+}, [token]);
 
   // Mettre à jour le compteur de messages au démarrage et quand on reçoit de nouveaux messages
   useEffect(() => {

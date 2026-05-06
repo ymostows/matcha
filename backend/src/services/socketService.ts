@@ -173,12 +173,14 @@ export class SocketService {
     if (userSockets) {
       userSockets.delete(socket.id);
       
-      // Si c'était le dernier socket de cet utilisateur
       if (userSockets.size === 0) {
         this.connectedUsers.delete(socket.userId);
         this.userSockets.delete(socket.userId);
         
-        // Notifier les autres utilisateurs du statut hors ligne
+        // Mettre à jour last_seen à la déconnexion
+        pool.query('UPDATE users SET last_seen = CURRENT_TIMESTAMP WHERE id = $1', [socket.userId])
+          .catch(() => {});
+        
         socket.broadcast.emit('user_offline', {
           userId: socket.userId,
           username: socket.username

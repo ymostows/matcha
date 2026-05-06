@@ -28,6 +28,7 @@ import { getPhotoUrl as getStandardPhotoUrl } from '../utils/imageUtils';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../hooks/useToast';
 import { useDialog } from '../hooks/useDialog';
+import { useSocket } from '../contexts/SocketContext';
 import { LikesHistory } from '../components/matches/LikesHistory';
 import { VisitsHistory } from '../components/matches/VisitsHistory';
 
@@ -47,7 +48,6 @@ export const ProfilePublicPage: React.FC = () => {
     hasLikedMe: boolean;
   }>({ isLiked: false, isMatched: false, hasLikedMe: false });
   const [isActionLoading, setIsActionLoading] = useState(false);
-  
   // Hooks pour les notifications et dialogs
   const { success, error: errorToast, warning } = useToast();
   const { 
@@ -71,6 +71,12 @@ export const ProfilePublicPage: React.FC = () => {
   const isProfileCreated = location.pathname === '/profile-success';
 
   const toastShownRef = useRef(false);
+
+  const { onlineUsers } = useSocket();
+
+  const isOnline = !isOwnProfile && userId 
+    ? onlineUsers.some(u => u.userId === parseInt(userId))
+    : false;
 
   useEffect(() => {
     if (location.state?.showSuccessToast && !toastShownRef.current) {
@@ -420,12 +426,6 @@ export const ProfilePublicPage: React.FC = () => {
                       </h1>
                       {!isOwnProfile && (
                         <div className="flex flex-wrap justify-center sm:justify-start items-center gap-2">
-                          {likeStatus.isMatched && (
-                            <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium flex items-center gap-1">
-                              <Heart className="w-3 h-3 fill-current" />
-                              Connecté
-                            </span>
-                          )}
                           {!likeStatus.isMatched && likeStatus.hasLikedMe && (
                             <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium flex items-center gap-1">
                               <Heart className="w-3 h-3" />
@@ -457,12 +457,12 @@ export const ProfilePublicPage: React.FC = () => {
                           )}
                         </span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <div className={`w-2 h-2 rounded-full ${isUserOnline(profile.last_seen) ? 'bg-green-500' : 'bg-gray-400'}`} />
+                      {!isOwnProfile && (<div className="flex items-center gap-2">
+                        <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
                         <span className="text-sm">
-                          {isUserOnline(profile.last_seen) ? 'En ligne' : `Vu ${formatLastSeen(profile.last_seen)}`}
+                          {isOnline ? 'En ligne' : `Vu ${formatLastSeen(profile.last_seen)}`}
                         </span>
-                      </div>
+                      </div>)}
                     </div>
                   </div>
 
