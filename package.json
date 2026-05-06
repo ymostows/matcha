@@ -3,6 +3,8 @@
     "@types/react-toastify": "^4.0.2"
   },
   "dependencies": {
+    "@types/react-router-dom": "^5.3.3",
+    "react-router-dom": "^7.15.0",
     "swr": "^2.3.4"
   }
 }
