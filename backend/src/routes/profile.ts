@@ -802,6 +802,13 @@ router.post('/like', authenticateToken, async (req: Request, res: Response): Pro
             VALUES ($1, $2)
             ON CONFLICT (user1_id, user2_id) DO NOTHING
           `, [Math.min(userId, targetUserId), Math.max(userId, targetUserId)]);
+
+          await client.query(`
+            UPDATE conversations 
+            SET is_active = true 
+            WHERE (user1_id = $1 AND user2_id = $2) 
+              OR (user1_id = $2 AND user2_id = $1)
+          `, [Math.min(userId, targetUserId), Math.max(userId, targetUserId)]);
         }
       }
 

@@ -53,17 +53,19 @@ const ChatPage: React.FC = () => {
 
   // Rejoindre/quitter la conversation Socket.io et marquer comme lu
   useEffect(() => {
-    if (conversationId && isConnected) {
-      joinConversation(parseInt(conversationId));
-      
-      // Marquer les messages comme lus quand on ouvre la conversation
-      markMessagesAsRead();
-      
-      return () => {
-        leaveConversation(parseInt(conversationId));
-      };
-    }
-  }, [conversationId, isConnected, joinConversation, leaveConversation]);
+      if (conversationId && isConnected) {
+        joinConversation(parseInt(conversationId));
+        return () => {
+          leaveConversation(parseInt(conversationId));
+        };
+      }
+  }, [conversationId, isConnected]);
+
+  useEffect(() => {
+      if (conversationId) {
+        markMessagesAsRead();
+      }
+  }, [conversationId]);
 
   // Écouter les nouveaux messages
   useEffect(() => {

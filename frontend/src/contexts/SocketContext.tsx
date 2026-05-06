@@ -60,6 +60,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   const typingCallbacks = useRef<((data: any) => void)[]>([]);
   const stopTypingCallbacks = useRef<((data: any) => void)[]>([]);
   const [totalUnreadMessages, setTotalUnreadMessages] = useState(0);
+  
 
   // Connexion Socket.io avec le SocketManager résilient
   useEffect(() => {
@@ -360,18 +361,31 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   };
 
   // Fonction pour mettre à jour le compte des messages non lus
+  const updateUnreadMessageCountRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const updateUnreadMessageCount = useCallback(async () => {
-    try {
-      const conversations = await fetch('http://localhost:3001/api/chat/conversations', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (conversations.ok) {
-        const data = await conversations.json();
-        const total = data.conversations?.reduce((acc: number, conv: any) => acc + (conv.unread_count || 0), 0) || 0;
-        setTotalUnreadMessages(total);
+      // Annuler l'appel précédent si pas encore exécuté
+      if (updateUnreadMessageCountRef.current) {
+        clearTimeout(updateUnreadMessageCountRef.current);
       }
-    } catch (error) {}
-}, [token]);
+      
+      updateUnreadMessageCountRef.current = setTimeout(async () => {
+        try {
+          const conversations = await fetch('http://localhost:3001/api/chat/conversations', {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          
+          if (conversations.ok) {
+            const data = await conversations.json();
+            const total = data.conversations?.reduce((acc: number, conv: any) => acc + (conv.unread_count || 0), 0) || 0;
+            setTotalUnreadMessages(total);
+          }
+        } catch (error) {}
+      }, 1000); // attendre 1 seconde avant d'exécuter
+  }, [token]);
 
   // Mettre à jour le compteur de messages au démarrage et quand on reçoit de nouveaux messages
   useEffect(() => {
