@@ -52,7 +52,7 @@ export const MatchesList: React.FC<MatchesListProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [limit, errorToast]);
+  }, [limit]);
 
   const applyFiltersAndSort = useCallback(() => {
     let filtered = [...matches];

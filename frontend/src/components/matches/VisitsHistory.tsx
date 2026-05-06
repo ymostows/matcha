@@ -34,7 +34,7 @@ export const VisitsHistory: React.FC<VisitsHistoryProps> = ({
       setIsLoading(false);
       setIsInitialized(true);
     }
-  }, [limit, isInitialized]);
+  }, [limit]);
 
   useEffect(() => {
     loadVisitsHistory();

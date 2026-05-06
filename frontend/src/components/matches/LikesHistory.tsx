@@ -50,7 +50,7 @@ export const LikesHistory: React.FC<LikesHistoryProps> = ({
       setIsLoading(false);
       setIsInitialized(true);
     }
-  }, [limit, errorToast, isInitialized]);
+  }, [limit]);
 
   useEffect(() => {
     loadLikesHistory();
