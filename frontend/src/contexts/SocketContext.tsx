@@ -37,6 +37,7 @@ interface SocketContextType {
   onUserTyping: (callback: (data: { userId: number; username: string; conversationId?: number }) => void) => void;
   onUserStopTyping: (callback: (data: { userId: number; username: string; conversationId?: number }) => void) => void;
   getTotalUnreadMessages: () => number;
+  checkOnlineStatus: (userIds: number[]) => void;
 }
 
 const SocketContext = createContext<SocketContextType | undefined>(undefined);
@@ -159,6 +160,18 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
         setOnlineUsers(prev => prev.filter(u => u.userId !== user.userId));
       });
 
+      const cleanupOnlineStatus = manager.on('online_status', (statuses: { userId: number; isOnline: boolean }[]) => {
+        statuses.forEach(({ userId, isOnline }) => {
+          if (isOnline) {
+            setOnlineUsers(prev => 
+              prev.find(u => u.userId === userId) ? prev : [...prev, { userId, username: '' }]
+            );
+          } else {
+            setOnlineUsers(prev => prev.filter(u => u.userId !== userId));
+          }
+        });
+      });
+
       // Gérer les mises à jour en mode fallback polling
       const cleanupNotificationsUpdate = manager.on('notifications_update', (data: any) => {
         if (data.notifications) {
@@ -192,6 +205,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
         cleanupUserStopTyping();
         cleanupUserOnline();
         cleanupUserOffline();
+        cleanupOnlineStatus();
         cleanupNotificationsUpdate();
         cleanupMessagesUpdate();
         
@@ -313,6 +327,12 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     };
   };
 
+  const checkOnlineStatus = useCallback((userIds: number[]) => {
+    if (socketManager) {
+      socketManager.emit('get_online_users', userIds);
+    }
+  }, [socketManager]);
+
   const onUserTyping = (callback: (data: { userId: number; username: string; conversationId?: number }) => void) => {
     typingCallbacks.current.push(callback);
     
@@ -389,8 +409,10 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     onMessageRead,
     onUserTyping,
     onUserStopTyping,
-    getTotalUnreadMessages
+    getTotalUnreadMessages,
+    checkOnlineStatus
   };
+
 
   return (
     <SocketContext.Provider value={value}>

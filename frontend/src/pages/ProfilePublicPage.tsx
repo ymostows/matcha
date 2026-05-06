@@ -72,7 +72,7 @@ export const ProfilePublicPage: React.FC = () => {
 
   const toastShownRef = useRef(false);
 
-  const { onlineUsers } = useSocket();
+  const { onlineUsers, checkOnlineStatus } = useSocket();
 
   const isOnline = !isOwnProfile && userId 
     ? onlineUsers.some(u => u.userId === parseInt(userId))
@@ -91,6 +91,7 @@ export const ProfilePublicPage: React.FC = () => {
     loadProfile();
     if (!isOwnProfile && userId) {
       loadLikeStatus();
+      checkOnlineStatus([parseInt(userId)]);
     }
   }, [userId, isOwnProfile]);
 

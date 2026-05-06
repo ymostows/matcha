@@ -177,14 +177,19 @@ export class SocketService {
         this.connectedUsers.delete(socket.userId);
         this.userSockets.delete(socket.userId);
         
-        // Mettre à jour last_seen à la déconnexion
-        pool.query('UPDATE users SET last_seen = CURRENT_TIMESTAMP WHERE id = $1', [socket.userId])
-          .catch(() => {});
-        
-        socket.broadcast.emit('user_offline', {
-          userId: socket.userId,
-          username: socket.username
-        });
+        // Délai pour absorber les reloads (reconnexion rapide)
+        setTimeout(() => {
+          // Vérifier que l'utilisateur n'est pas revenu entre temps
+          if (!this.connectedUsers.has(socket.userId!)) {
+            pool.query('UPDATE users SET last_seen = CURRENT_TIMESTAMP WHERE id = $1', [socket.userId])
+              .catch(() => {});
+            
+            socket.broadcast.emit('user_offline', {
+              userId: socket.userId,
+              username: socket.username
+            });
+          }
+        }, 1000);
       }
     }
   }
