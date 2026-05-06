@@ -697,6 +697,18 @@ router.delete('/matches/:matchId', authenticateToken, async (req: AuthenticatedR
         message: 'Match supprimé avec succès'
       });
 
+      try {
+        const userProfile = await ProfileModel.findCompleteProfile(userId);
+        await createNotification(
+          otherUserId,
+          NotificationType.UNLIKE,
+          `💔 ${userProfile?.first_name} a annulé votre match`,
+          { userId: userId, profileName: userProfile?.first_name }
+        );
+      } catch (notifError) {
+        // Ne pas faire échouer la requête si la notification échoue
+      }
+
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;

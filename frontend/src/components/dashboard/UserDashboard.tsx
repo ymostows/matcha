@@ -272,7 +272,7 @@ export const UserDashboard: React.FC = () => {
           className="min-h-0 flex flex-col"
         >
           <div className="flex-1 max-h-[500px] xl:max-h-[600px] overflow-hidden">
-            <MatchesSection limit={6} refreshTrigger={refreshTrigger} />
+            <MatchesSection limit={6} refreshTrigger={refreshTrigger} onUnmatch={refreshStats}/>
           </div>
         </motion.div>
 

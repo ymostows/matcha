@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useSocket } from '../../contexts/SocketContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Users
@@ -11,15 +12,18 @@ import { useToast } from '../../hooks/useToast';
 interface MatchesSectionProps {
   limit?: number;
   refreshTrigger?: number;
+  onUnmatch?: () => void;
 }
 
 export const MatchesSection: React.FC<MatchesSectionProps> = ({ 
   limit = 6,
-  refreshTrigger
+  refreshTrigger,
+  onUnmatch
 }) => {
   const { success: successToast, error: errorToast } = useToast();
   const [matches, setMatches] = useState<MatchItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const { notifications } = useSocket();
 
   useEffect(() => {
     loadMatches();
@@ -31,7 +35,18 @@ export const MatchesSection: React.FC<MatchesSectionProps> = ({
     }
   }, [refreshTrigger]);
 
-  const loadMatches = async () => {
+  useEffect(() => {
+    if (notifications.length === 0) return;
+    
+    const latest = notifications[0]; // la plus récente est toujours en premier
+    const isRecent = new Date(latest.created_at).getTime() > Date.now() - 5000;
+    
+    if (isRecent && ['unlike', 'match'].includes(latest.type)) {
+      loadMatches();
+    }
+  }, [notifications]);
+
+  const loadMatches = useCallback(async () => {
     try {
       setIsLoading(true);
       const response = await profileApi.getMatches(limit, 0);
@@ -41,13 +56,14 @@ export const MatchesSection: React.FC<MatchesSectionProps> = ({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [limit]);
 
   const handleUnmatch = async (matchId: number) => {
     try {
       await profileApi.unmatchUser(matchId);
       setMatches(prev => prev.filter(match => match.match_id !== matchId));
       successToast('Match supprimé avec succès');
+      onUnmatch?.();
     } catch (error) {
       errorToast('Impossible de supprimer le match');
       throw error;
