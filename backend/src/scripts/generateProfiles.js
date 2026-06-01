@@ -221,8 +221,6 @@ async function createProfilePhotos(userId, firstName, lastName, gender) {
         'INSERT INTO photos (user_id, filename, image_data, is_profile_picture) VALUES ($1, $2, $3, $4)',
         [userId, filename, imageData, isProfilePicture]
       );
-      
-      console.log(`✅ Photo ${i + 1}/3 créée`);
     }
   } finally {
     client.release();
@@ -312,10 +310,6 @@ async function generateProfiles(count = 10) {
         const lng = cityObj.lng + (Math.random() - 0.5) * 0.1;
         
         await updateLocation(user.id, lat, lng);
-        
-        console.log(`✅ Profil créé: ${firstName} ${lastName} à ${city}`);
-        console.log(`💭 Orientation: ${orientation}`);
-        console.log(`🎯 Intérêts: ${userInterests.slice(0, 3).join(', ')}`);
         
         // Créer les photos
         await createProfilePhotos(user.id, firstName, lastName, gender);
