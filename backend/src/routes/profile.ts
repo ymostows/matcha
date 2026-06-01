@@ -683,11 +683,16 @@ router.delete('/matches/:matchId', authenticateToken, async (req: AuthenticatedR
       // Supprimer le match
       await client.query('DELETE FROM matches WHERE id = $1', [matchId]);
 
-      // Supprimer les likes mutuels
       await client.query(`
         DELETE FROM likes 
         WHERE (liker_id = $1 AND liked_id = $2) 
            OR (liker_id = $2 AND liked_id = $1)
+      `, [userId, otherUserId]);
+
+      await client.query(`
+        UPDATE conversations
+        SET is_active = false
+        WHERE (user1_id = $1 AND user2_id = $2) OR (user1_id = $2 AND user2_id = $1)
       `, [userId, otherUserId]);
 
       await client.query('COMMIT');

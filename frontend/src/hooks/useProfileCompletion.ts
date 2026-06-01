@@ -60,15 +60,22 @@ export const checkProfileCompletion = (profile: any): { isComplete: boolean; mis
 };
 
 export const useProfileCompletion = (): ProfileCompletionStatus => {
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const [status, setStatus] = useState<ProfileCompletionStatus>({
     isComplete: false,
+    // Démarrer en mode "chargement" tant que l'auth est en cours
     isLoading: true,
     completionPercentage: 0,
     missingFields: []
   });
 
   useEffect(() => {
+    // Tant que l'auth est en cours de chargement, ne pas conclure
+    if (authLoading) {
+      setStatus(prev => ({ ...prev, isLoading: true }));
+      return;
+    }
+
     if (!user) {
       setStatus({ isComplete: false, isLoading: false, completionPercentage: 0, missingFields: ['Profil non chargé'] });
       return;
@@ -88,7 +95,7 @@ export const useProfileCompletion = (): ProfileCompletionStatus => {
       completionPercentage,
       missingFields: finalIsComplete ? [] : missingFields
     });
-  }, [user]);
+  }, [user, authLoading]);
 
   return status;
-}; 
+};
